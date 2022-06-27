@@ -10,6 +10,7 @@ secsToHMS = lambda sec: str(timedelta(seconds=sec)).split(".")[0]
 
 collectAtElement = lambda itr, idx: [x[idx] for x in itr]
 
+eMap = lambda func, itr: tuple(map(func, itr))
 
 def exitIfEmpty(x):
     if not x:

@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from statistics import fmean, mode
 
-from src.ffHelpers import getFormatData, getMetaData
+from src.ffHelpers import getFormatKeys, getMetaData
 from src.helpers import (
     checkPath,
     collectAtElement,
@@ -10,6 +10,7 @@ from src.helpers import (
     round2,
     secsToHMS,
     exitIfEmpty,
+    eMap,
 )
 from src.cliHelpers import sepExts, addCliDir, addCliRec
 
@@ -46,7 +47,9 @@ exitIfEmpty(fileList)
 
 cmdOut = [getMetaData(ffprobePath, f) for f in fileList]
 
-formatData = [getFormatData(o) for o in cmdOut]
+keys = ("duration", "bit_rate", "nb_streams")
+
+formatData = [eMap(float, getFormatKeys(o, keys)) for o in cmdOut]
 
 durations = collectAtElement(formatData, 0)
 
