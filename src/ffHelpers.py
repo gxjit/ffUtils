@@ -42,6 +42,8 @@ ffmpegConcatCmd = lambda ffmpegPath, splitsFile, outFile: [
     ffmpegPath,
     "-f",
     "concat",
+    "-safe",
+    "0",
     "-i",
     str(splitsFile),
     "-c",

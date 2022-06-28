@@ -1,15 +1,17 @@
 from argparse import ArgumentParser
 
-from src.cliHelpers import addCliDir, addCliRec, addCliDry, sepExts
-from src.ffHelpers import (
-    ffmpegConcatCmd,
-    ffmpegTrimCmd,
-    getFormatKeys,
-    getMetaData,
+from src.cliHelpers import addCliDir, addCliDry, addCliRec, sepExts
+from src.ffHelpers import ffmpegConcatCmd, ffmpegTrimCmd, getFormatKeys, getMetaData
+from src.helpers import (
+    checkPaths,
+    emap,
+    exitIfEmpty,
+    getFileList,
+    range1,
+    removeFiles,
+    runCmd,
+    strSum,
 )
-from src.helpers import checkPaths, emap, runCmd, exitIfEmpty, getFileList, range1, removeFiles, strSum
-
-# Note: WIP
 
 
 def parseArgs():
@@ -44,7 +46,13 @@ def parseArgs():
         type=int,
         help="Number of samples samples.",
     )
-
+    parser.add_argument(
+        "-o",
+        "--only",
+        default=None,
+        type=int,
+        help="Only process N files.",
+    )
     return parser.parse_args()
 
 
@@ -57,26 +65,8 @@ ffprobePath, ffmpegPath = checkPaths(
     }
 )
 
-runCmd = print  # test
-
-
-def makeSplits(file, splits, length):
-    outFiles = []
-    nameSum = strSum(file.name)
-    for i, s in enumerate(splits, start=1):
-        outFile = file.with_stem(f"tmp_{nameSum}_{i}")
-        runCmd(ffmpegTrimCmd(ffmpegPath, file, outFile, s, length))
-        outFiles = [*outFiles, outFile]
-
-    concat = "\n".join([f"file '{f}'\n" for f in outFiles])
-    splitsFile = file.with_suffix(".splits")
-    if not pargs.dry:
-        splitsFile.write_text(concat)
-    return (splitsFile, outFiles)
-
-
-def concatSplits(splitsFile, outFile):
-    runCmd(ffmpegConcatCmd(ffmpegPath, splitsFile, outFile))
+if pargs.dry:
+    runCmd = print
 
 
 def calcSplits(secs, splits, length):
@@ -84,30 +74,50 @@ def calcSplits(secs, splits, length):
     return [(s * i - length) for i in range1(splits)]
 
 
-def doStuff(file):
+def makeSplits(ffmpegPath, file, splits, length):
+    outFiles = []
+    nameSum = strSum(file.name)
+    for i, s in enumerate(splits, start=1):
+        outFile = file.with_stem(f"tmp_{nameSum}_{i}")
+        runCmd(ffmpegTrimCmd(ffmpegPath, file, outFile, s, length))
+        outFiles = [*outFiles, outFile]
+    concat = "\n".join([f"file '{f}'" for f in outFiles])
+    splitsFile = file.with_suffix(".splits")
+    if not pargs.dry:
+        splitsFile.write_text(concat)
+    else:
+        print(concat)
+    return (splitsFile, outFiles)
 
-    outFile = file.with_name(f"trm_{file.name}") # outfiles?
+
+def concatSplits(ffmpegPath, splitsFile, tmpFiles, outFile):
+    runCmd(ffmpegConcatCmd(ffmpegPath, splitsFile, outFile))
+    if not pargs.dry:
+        removeFiles([splitsFile, *tmpFiles])
+
+
+def doStuff(file):
+    outFile = file.with_name(f"trm_{file.name}")  # outfiles?
     metaData = getMetaData(ffprobePath, file)
     duration = getFormatKeys(metaData, "duration")
     splits = calcSplits(duration, pargs.samples, pargs.length)
-    splitsFile = makeSplits(file, splits, pargs.length)
-    concatSplits(splitsFile[0], outFile)
-    if not pargs.dry:
-        removeFiles([splitsFile[0], *splitsFile[1]])
+    splitsFile, tmpFiles = makeSplits(ffmpegPath, file, splits, pargs.length)
+    concatSplits(ffmpegPath, splitsFile, tmpFiles, outFile)
 
-    print(duration, splits, splitsFile)
 
 def main():
-
     fileList = getFileList(pargs.dir.resolve(), pargs.extensions, pargs.recursive)
 
     exitIfEmpty(fileList)
 
+    if pargs.only:
+        fileList = fileList[: pargs.only]
+
     emap(doStuff, fileList)
+
 
 main()
 
 
 # different algos for splits
-# find 20 40 60 80 % of the video / divide dur by N splits
 # follow symlinks?
