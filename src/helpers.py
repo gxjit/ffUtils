@@ -49,10 +49,11 @@ def checkPath(path, absPath=None):
 
 def checkPaths(paths):
     if isinstance(paths, dict):
-        retr = []
-        for p, ap in paths.items():
-            retr = [*retr, checkPath(p, ap)]
-        return retr
+        # retr = []
+        # for p, ap in paths.items():
+        #     retr = [*retr, checkPath(p, ap)]
+        # return retr
+        return [checkPath(p, ap) for p, ap in paths.items()]
 
 
 

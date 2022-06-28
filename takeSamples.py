@@ -79,24 +79,23 @@ def concatSplits(splitsFile, outFile):
     runCmd(ffmpegConcatCmd(ffmpegPath, splitsFile, outFile))
 
 
-def calcDurs(secs, splits, length):
+def calcSplits(secs, splits, length):
     s = float(secs) / splits
     return [(s * i - length) for i in range1(splits)]
 
 
 def doStuff(file):
 
-    outFile = outFile = file.with_name(f"trm_{file.name}")
+    outFile = file.with_name(f"trm_{file.name}")
     metaData = getMetaData(ffprobePath, file)
     duration = getFormatKeys(metaData, "duration")
-    splits = calcDurs(duration, pargs.samples, pargs.length)
+    splits = calcSplits(duration, pargs.samples, pargs.length)
     splitsFile = makeSplits(file, splits, pargs.length)
     concatSplits(splitsFile[0], outFile)
     if not pargs.dry:
         removeFiles([splitsFile[0], *splitsFile[1]])
 
     print(duration, splits, splitsFile)
-    exit()
 
 def main():
 
