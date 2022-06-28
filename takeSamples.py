@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from functools import partial
 
 from src.cliHelpers import addCliDir, addCliDry, addCliRec, sepExts
 from src.ffHelpers import ffmpegConcatCmd, ffmpegTrimCmd, getFormatKeys, getMetaData
@@ -96,7 +97,7 @@ def concatSplits(ffmpegPath, splitsFile, tmpFiles, outFile):
         removeFiles([splitsFile, *tmpFiles])
 
 
-def doStuff(file):
+def go(file, pargs, ffmpegPath, ffprobePath):
     outFile = file.with_name(f"trm_{file.name}")  # outfiles?
     metaData = getMetaData(ffprobePath, file)
     duration = getFormatKeys(metaData, "duration")
@@ -113,7 +114,9 @@ def main():
     if pargs.only:
         fileList = fileList[: pargs.only]
 
-    emap(doStuff, fileList)
+    goP = partial(go, pargs=pargs, ffmpegPath=ffmpegPath, ffprobePath=ffprobePath)
+
+    emap(goP, fileList)
 
 
 main()
