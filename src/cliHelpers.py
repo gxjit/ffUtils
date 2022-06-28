@@ -1,6 +1,7 @@
 from pathlib import Path
 from argparse import ArgumentTypeError
 
+from .helpers import efilter
 
 def checkDirPath(pth):
     pthObj = Path(pth)
@@ -12,7 +13,7 @@ def checkDirPath(pth):
 
 def sepExts(exts):
     if "," in exts:
-        return tuple(filter(len, exts.strip().split(",")))
+        return efilter(len, exts.strip().split(","))
     else:
         return [exts]
         # raise ArgumentTypeError("Invalid extensions list")

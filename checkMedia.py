@@ -4,13 +4,13 @@ from statistics import fmean, mode
 from src.ffHelpers import getFormatKeys, getMetaData
 from src.helpers import (
     checkPath,
-    collectAtElement,
+    collectAtIndex,
     convertSize,
     getFileList,
     round2,
     secsToHMS,
     exitIfEmpty,
-    eMap,
+    emap,
 )
 from src.cliHelpers import sepExts, addCliDir, addCliRec
 
@@ -45,15 +45,17 @@ fileList = getFileList(pargs.dir.resolve(), pargs.extensions, pargs.recursive)
 
 exitIfEmpty(fileList)
 
-cmdOut = [getMetaData(ffprobePath, f) for f in fileList]
+metaData = [getMetaData(ffprobePath, f) for f in fileList]
 
 keys = ("duration", "bit_rate", "nb_streams")
 
-formatData = [eMap(float, getFormatKeys(o, keys)) for o in cmdOut]
+formatData = [emap(float, getFormatKeys(m, keys)) for m in metaData]
 
-durations = collectAtElement(formatData, 0)
+durations = collectAtIndex(formatData, 0)
 
-bitRates = collectAtElement(formatData, 1)
+bitRates = collectAtIndex(formatData, 1)
+
+streams = collectAtIndex(formatData, 2)
 
 sumDur = round2(sum(durations))
 
@@ -63,7 +65,7 @@ sumBitR = round2(sum(bitRates))
 
 meanBitR = round2(fmean(bitRates))
 
-modeStreams = mode(collectAtElement(formatData, 2))
+modeStreams = mode(streams)
 
 
 print(
