@@ -21,6 +21,7 @@ range1 = lambda l, f=1, s=1: range(f, l + 1, s)
 
 strSum = lambda datum: adler32(datum.encode("utf8"))
 
+
 def exitIfEmpty(x):
     if not x:
         print("Nothing to do.")
@@ -49,12 +50,7 @@ def checkPath(path, absPath=None):
 
 def checkPaths(paths):
     if isinstance(paths, dict):
-        # retr = []
-        # for p, ap in paths.items():
-        #     retr = [*retr, checkPath(p, ap)]
-        # return retr
         return [checkPath(p, ap) for p, ap in paths.items()]
-
 
 
 def checkExceptions(output):

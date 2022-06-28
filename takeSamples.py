@@ -7,7 +7,7 @@ from src.ffHelpers import (
     getFormatKeys,
     getMetaData,
 )
-from src.helpers import checkPaths, emap, exitIfEmpty, getFileList, range1, removeFiles, strSum
+from src.helpers import checkPaths, emap, runCmd, exitIfEmpty, getFileList, range1, removeFiles, strSum
 
 # Note: WIP
 
@@ -86,7 +86,7 @@ def calcSplits(secs, splits, length):
 
 def doStuff(file):
 
-    outFile = file.with_name(f"trm_{file.name}")
+    outFile = file.with_name(f"trm_{file.name}") # outfiles?
     metaData = getMetaData(ffprobePath, file)
     duration = getFormatKeys(metaData, "duration")
     splits = calcSplits(duration, pargs.samples, pargs.length)
