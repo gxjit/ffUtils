@@ -3,6 +3,9 @@ from datetime import timedelta
 from shutil import which
 from subprocess import run
 from traceback import format_exc
+from collections.abc import Iterable
+from pathlib import Path
+from zlib import adler32
 
 round2 = lambda x: round(float(x), ndigits=2)
 
@@ -16,6 +19,7 @@ efilter = lambda func, itr: tuple(filter(func, itr))
 
 range1 = lambda l, f=1, s=1: range(f, l + 1, s)
 
+strSum = lambda datum: adler32(datum.encode("utf8"))
 
 def exitIfEmpty(x):
     if not x:
@@ -41,6 +45,15 @@ def checkPath(path, absPath=None):
         return absPath
     else:
         raise f"{path} or {absPath} is not an executable."
+
+
+def checkPaths(paths):
+    if isinstance(paths, dict):
+        retr = []
+        for p, ap in paths.items():
+            retr = [*retr, checkPath(p, ap)]
+        return retr
+
 
 
 def checkExceptions(output):
@@ -69,6 +82,18 @@ def reportErrExit(exp=None):
             f"\nException:\n{exp}\n\nAdditional Details:\n{format_exc()}",
         )
     exit()
+
+
+def removeFile(file):
+    if isinstance(file, Path):
+        if file.exists() and file.is_file():
+            file.unlink()
+
+
+def removeFiles(files):
+    if isinstance(files, Iterable) and not isinstance(files, str):
+        for f in files:
+            removeFile(f)
 
 
 def convertSize(sBytes):

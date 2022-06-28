@@ -3,6 +3,7 @@ from argparse import ArgumentTypeError
 
 from .helpers import efilter
 
+
 def checkDirPath(pth):
     pthObj = Path(pth)
     if pthObj.is_dir():
@@ -30,5 +31,15 @@ def addCliRec(parser):
         "--recursive",
         action="store_true",
         help="Process files recursively in all child directories.",
+    )
+    return parser
+
+
+def addCliDry(parser):
+    parser.add_argument(
+        "-n",
+        "--dry",
+        action="store_true",
+        help="Dry run.",
     )
     return parser

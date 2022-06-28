@@ -1,14 +1,13 @@
 from argparse import ArgumentParser
 
-from src.cliHelpers import addCliDir, addCliRec, sepExts
+from src.cliHelpers import addCliDir, addCliRec, addCliDry, sepExts
 from src.ffHelpers import (
     ffmpegConcatCmd,
     ffmpegTrimCmd,
     getFormatKeys,
     getMetaData,
-    runCmd,
 )
-from src.helpers import checkPath, emap, exitIfEmpty, getFileList, range1
+from src.helpers import checkPaths, emap, exitIfEmpty, getFileList, range1, removeFiles, strSum
 
 # Note: WIP
 
@@ -17,12 +16,13 @@ def parseArgs():
 
     parser = ArgumentParser(
         description=(
-            "Trim specific number of samples from Video/Audio content "
+            "Trim specific number of samples from Video content "
             "for specified lengths and concatenate them into a single file."
         )
     )
     parser = addCliDir(parser)
     parser = addCliRec(parser)
+    parser = addCliDry(parser)
     parser.add_argument(
         "-e",
         "--extensions",
@@ -38,7 +38,7 @@ def parseArgs():
         help="Length/Duration to be used for taking samples.",
     )
     parser.add_argument(
-        "-n",
+        "-s",
         "--samples",
         default=5,
         type=int,
@@ -50,23 +50,28 @@ def parseArgs():
 
 pargs = parseArgs()
 
-ffprobePath = checkPath("ffprobe", r"D:\PortableApps\bin\ffprobe.exe")
-ffmpegPath = checkPath("ffmpeg", r"D:\PortableApps\bin\ffmpeg.exe")
+ffprobePath, ffmpegPath = checkPaths(
+    {
+        "ffprobe": r"D:\PortableApps\bin\ffprobe.exe",
+        "ffmpeg": r"D:\PortableApps\bin\ffmpeg.exe",
+    }
+)
 
 runCmd = print  # test
 
 
 def makeSplits(file, splits, length):
     outFiles = []
+    nameSum = strSum(file.name)
     for i, s in enumerate(splits, start=1):
-        outFile = file.with_stem(f"tmp{i}")
-
+        outFile = file.with_stem(f"tmp_{nameSum}_{i}")
         runCmd(ffmpegTrimCmd(ffmpegPath, file, outFile, s, length))
         outFiles = [*outFiles, outFile]
 
     concat = "\n".join([f"file '{f}'\n" for f in outFiles])
     splitsFile = file.with_suffix(".splits")
-    # splitsFile.write_text(concat)
+    if not pargs.dry:
+        splitsFile.write_text(concat)
     return (splitsFile, outFiles)
 
 
@@ -81,24 +86,28 @@ def calcDurs(secs, splits, length):
 
 def doStuff(file):
 
-    # metaData = [getMetaData(ffprobePath, f) for f in fileList]
     outFile = outFile = file.with_name(f"trm_{file.name}")
     metaData = getMetaData(ffprobePath, file)
     duration = getFormatKeys(metaData, "duration")
     splits = calcDurs(duration, pargs.samples, pargs.length)
     splitsFile = makeSplits(file, splits, pargs.length)
     concatSplits(splitsFile[0], outFile)
-    # remove temp files
+    if not pargs.dry:
+        removeFiles([splitsFile[0], *splitsFile[1]])
 
     print(duration, splits, splitsFile)
     exit()
 
+def main():
 
-fileList = getFileList(pargs.dir.resolve(), pargs.extensions, pargs.recursive)
+    fileList = getFileList(pargs.dir.resolve(), pargs.extensions, pargs.recursive)
 
-exitIfEmpty(fileList)
+    exitIfEmpty(fileList)
 
-emap(doStuff, fileList)
+    emap(doStuff, fileList)
+
+main()
+
 
 # different algos for splits
 # find 20 40 60 80 % of the video / divide dur by N splits
