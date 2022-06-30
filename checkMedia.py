@@ -5,10 +5,10 @@ from src.ffHelpers import getFormatKeys, getMetaData
 from src.helpers import (
     checkPath,
     collectAtIndex,
-    convertSize,
     getFileList,
     round2,
-    secsToHMS,
+    readableSize,
+    readableTime,
     exitIfEmpty,
     emap,
 )
@@ -70,10 +70,10 @@ modeStreams = mode(streams)
 
 print(
     f"\nContainer format summary for {len(formatData)} files:\n"
-    f"Sum Duration: {secsToHMS(sumDur)}\n"
-    f"Mean Duration: {secsToHMS(meanDur)}\n"
-    f"Sum Bit Rate: {convertSize(sumBitR)}\n"
-    f"Mean Bit Rate: {convertSize(meanBitR)}\n"
+    f"Sum Duration: {readableTime(sumDur)}\n"
+    f"Mean Duration: {readableTime(meanDur)}\n"
+    f"Sum Bit Rate: {readableSize(sumBitR)}\n"
+    f"Mean Bit Rate: {readableSize(meanBitR)}\n"
     f"Mode Number of Streams: {int(modeStreams)}"
 )
 

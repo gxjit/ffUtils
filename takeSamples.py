@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-from functools import partial
 
 from src.cliHelpers import addCliDir, addCliDry, addCliRec, sepExts
 from src.ffHelpers import ffmpegConcatCmd, ffmpegTrimCmd, getFormatKeys, getMetaData
@@ -72,7 +71,7 @@ if pargs.dry:
 
 def calcSplits(secs, splits, length):
     s = float(secs) / splits
-    return [(s * i - length) for i in range1(splits)]
+    return [(s * i - length * i) for i in range1(splits)]
 
 
 def makeSplits(ffmpegPath, file, splits, length):
@@ -114,7 +113,7 @@ def main():
     if pargs.only:
         fileList = fileList[: pargs.only]
 
-    goP = partial(go, pargs=pargs, ffmpegPath=ffmpegPath, ffprobePath=ffprobePath)
+    goP = lambda f: go(f, pargs, ffmpegPath, ffprobePath)
 
     emap(goP, fileList)
 
