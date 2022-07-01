@@ -136,9 +136,9 @@ def getStats(results):
     # times = collectAtKey(results, ["timeTaken"])
     # inSizes = collectAtKey(results, ["input", "size"])
     outSizes = [float(x["output"]["size"]) for x in results]
-    lenghts = [float(x["input"]["meta"]["duration"]) for x in results]
-    VidBitsIn = [float(x["input"]["meta"]["bit_rate"]) for x in results]
-    VidBitsOut = [float(x["output"]["meta"]["bit_rate"]) for x in results]
+    lenghts = [float(x["input"]["meta"]["video"]["duration"]) for x in results]
+    VidBitsIn = [float(x["input"]["meta"]["video"]["bit_rate"]) for x in results]
+    VidBitsOut = [float(x["output"]["meta"]["video"]["bit_rate"]) for x in results]
     inSum, inMean = sum(inSizes), fmean(inSizes)
     outSum, outMean = sum(outSizes), fmean(outSizes)
     sumTimes, meanTimes = sum(times), fmean(times)
@@ -178,15 +178,16 @@ def mainLoop(file, pargs, ffmpegPath, ffprobePath):
     )
     ca = selectCodec(pargs.cAudio, pargs.qAudio)
     cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
-    outFile = file.with_name(f"{pargs.cVideo}_{cv[5]}_{cv[3]}_{file.name}")
+    outFile = file.with_name(
+        f"{(cv[1]).replace('lib', '')}_{cv[5]}_{cv[3]}_{file.name}"
+    )
     cmd = getffmpegCmd(ffmpegPath, file, outFile, ca, cv, ov)
 
     cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
 
     videoMetaOut = getSlctMetaP(outFile, "video")
-
     print(
-        f"\n\nVideo Input:: {readableDict(readableKeys(videoMetaIn))}"
+        f"\nVideo Input:: {readableDict(readableKeys(videoMetaIn))}"
         f"\nVideo Output:: {readableDict(readableKeys(videoMetaOut))}"
     )
 
@@ -196,12 +197,12 @@ def mainLoop(file, pargs, ffmpegPath, ffprobePath):
         "input": {
             "file": str(file),
             "size": file.stat().st_size,
-            "meta": videoMetaIn,
+            "meta": {"video": videoMetaIn},
         },
         "output": {
             "file": str(outFile),
             "size": outFile.stat().st_size,
-            "meta": videoMetaOut,
+            "meta": {"video": videoMetaOut},
         },
     }
 
