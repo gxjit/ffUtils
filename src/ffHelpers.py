@@ -1,9 +1,7 @@
-from json import loads
-from collections.abc import Iterable
 from fractions import Fraction
+from json import loads
 
-from .helpers import runCmd, readableSize, readableTime
-
+from .helpers import extractKeysDict, readableSize, readableTime, runCmd
 
 getffprobeCmd = lambda ffprobePath, file: [
     ffprobePath,
@@ -74,16 +72,6 @@ def getMetaData(ffprobePath, file):
     return metaData
 
 
-def extractKeysDict(dic, keys, asDict=False):
-    if isinstance(keys, str):
-        return dic.get(keys, "N/A")
-    elif isinstance(keys, Iterable):
-        if asDict:
-            return {k: dic.get(k, "N/A") for k in keys}
-        else:
-            return [dic.get(k, "N/A") for k in keys]
-
-
 def getFormatKeys(meta, keys, asDict=False):
     fmt = meta["format"]
     return extractKeysDict(fmt, keys, asDict)
@@ -106,11 +94,13 @@ def findStream(meta, sType):
         if cType == sType:
             return strm
 
+
 def getSlctMeta(ffprobePath, file, slctMeta, cdcType):
     metaData = getMetaData(ffprobePath, file)
     return getStreamKeys(
         metaData, findStream(metaData, cdcType), slctMeta(cdcType), asDict=True
     )
+
 
 def readableKeys(meta):
     retr = {}
@@ -234,5 +224,6 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
         opts = [*opts, "-vf", f"scale=-2:{str(limitRes)}"]
 
     return opts
+
 
 # streams=False "-show_streams" if streams else *[]

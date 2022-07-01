@@ -21,15 +21,13 @@ from src.helpers import (
     emap,
     exitIfEmpty,
     getFileList,
+    readableDict,
+    readableSize,
+    readableTime,
+    round2,
     runCmd,
     trackTime,
-    readableTime,
-    readableSize,
-    readableDict,
-    round2,
 )
-
-# Note: WIP
 
 
 def parseArgs():
@@ -126,47 +124,46 @@ if pargs.dry:
 # Format: nb_streams, duration, bit_rate, format_name, format_long_name
 
 
-def getStats(stats):
-    times = [float(x["timeTaken"]) for x in stats]
-    inSizes = [float(x["input"]["size"]) for x in stats]
-    # times = collectAtKey(stats, ["timeTaken"])
-    # inSizes = collectAtKey(stats, ["input", "size"])
-    outSizes = [float(x["output"]["size"]) for x in stats]
-    lenghts = [float(x["input"]["meta"]["duration"]) for x in stats]
-    bitsIn = [float(x["input"]["meta"]["bit_rate"]) for x in stats]
-    bitsOut = [float(x["output"]["meta"]["bit_rate"]) for x in stats]
+def getStats(results):
+    times = [float(x["timeTaken"]) for x in results]
+    inSizes = [float(x["input"]["size"]) for x in results]
+    # times = collectAtKey(results, ["timeTaken"])
+    # inSizes = collectAtKey(results, ["input", "size"])
+    outSizes = [float(x["output"]["size"]) for x in results]
+    lenghts = [float(x["input"]["meta"]["duration"]) for x in results]
+    VidBitsIn = [float(x["input"]["meta"]["bit_rate"]) for x in results]
+    VidBitsOut = [float(x["output"]["meta"]["bit_rate"]) for x in results]
     inSum, inMean = sum(inSizes), fmean(inSizes)
     outSum, outMean = sum(outSizes), fmean(outSizes)
     sumTimes, meanTimes = sum(times), fmean(times)
     sumLengths, meanLengths = sum(lenghts), fmean(lenghts)
-    bitsInMean, bitsOutMean = fmean(bitsIn), fmean(bitsOut)
+    VidBitsInMean, VidBitsOutMean = fmean(VidBitsIn), fmean(VidBitsOut)
 
     return (
         "\n"
         f"Size averages:: Reduction: {round2(((inMean-outMean)/inMean)*100)}%"
         f", Input: {(readableSize(inMean))}"
-        f", Output: {(readableSize(outMean))}."
+        f" & Output: {(readableSize(outMean))}."
         "\n"
         f"Size totals:: Reduction: {(readableSize(inSum-outSum))}"
         f", Input: {readableSize(inSum)}"
-        f", Output: {readableSize(outSum)}."
+        f" & Output: {readableSize(outSum)}."
         "\n"
         f"Processing averages:: Speed: x{round2(meanLengths/meanTimes)}"
         f", Time: {readableTime(meanTimes)}"
-        f", Length: {readableTime(meanLengths)}."
+        f" & Length: {readableTime(meanLengths)}."
         "\n"
-        f"Processing totals:: Files: {len(stats)}"
+        f"Processing totals:: Files: {len(results)}"
         f", Time: {readableTime(sumTimes)}"
-        f", Length: {readableTime(sumLengths)}."
+        f" & Length: {readableTime(sumLengths)}."
         "\n"
-        f"Video bitrate averages:: Reduction: {round2(((bitsInMean-bitsOutMean)/bitsInMean)*100)}%"
-        f", Input: {(readableSize(bitsInMean))}"
-        f", Output: {(readableSize(bitsOutMean))}."
+        f"Video bitrate averages:: Reduction: {round2(((VidBitsInMean-VidBitsOutMean)/VidBitsInMean)*100)}%"
+        f", Input: {(readableSize(VidBitsInMean))}"
+        f" & Output: {(readableSize(VidBitsOutMean))}."
     )
 
 
-def mainLoop(file):
-
+def mainLoop(file, pargs, ffmpegPath, ffprobePath):
     getSlctMetaP = lambda f, cdc: getSlctMeta(ffprobePath, f, meta, cdc)
     videoMetaIn = getSlctMetaP(file, "video")
 
@@ -174,11 +171,8 @@ def mainLoop(file):
         videoMetaIn["height"], videoMetaIn["r_frame_rate"], pargs.res, pargs.fps
     )
     ca = selectCodec(pargs.cAudio, pargs.qAudio)
-
-    outFile = file.with_name(f"{pargs.cVideo}_{cv[5]}_{cv[3]}_{file.name}")
-
     cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
-
+    outFile = file.with_name(f"{pargs.cVideo}_{cv[5]}_{cv[3]}_{file.name}")
     cmd = getffmpegCmd(ffmpegPath, file, outFile, ca, cv, ov)
 
     cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
@@ -212,26 +206,14 @@ def main():
     if pargs.only:
         fileList = fileList[: pargs.only]
 
-    logFile = dirPath / f"{dirPath.name}.log"
+    mainLoopP = lambda f: mainLoop(f, pargs, ffmpegPath, ffprobePath)
+    results = emap(mainLoopP, fileList)
+    stats = getStats(results)
 
-    stats = emap(mainLoop, fileList)
+    print(stats)
 
-    print(getStats(stats))
-
-    # logFile.write_text()
-    #
+    # logFile = dirPath / f"{dirPath.name}.log"
+    # appendFile(logFile, stats)
 
 
 main()
-
-# Size averages:: Reduction: 52.95%, Input: 292.66 KB, Output: 137.71 KB.
-# Size totals:: Reduction: 309.91 KB, Input: 585.32 KB, Output: 275.41 KB.
-# Processing averages:: Speed: x2.16, Time: 0:00:04, Length: 0:00:09.
-# Processing totals:: Files: 2, Time: 0:00:08, Length: 0:00:19.
-# Bitrate averages:: Reduction: 51.35%, Input: 96.09 KB, Output: 46.74 KB.
-
-# Processed 2 file(s) at average speed: x2.17 with 52.95% average size reduction.
-# Processed 0:00:19 in 0:00:08 at average processing time: 0:00:04.
-# Size Reduction from: 585.32 KB to: 275.41 KB by: 309.91 KB.
-# Size averages:: input: 292.66 KB, output: 137.71 KB
-# Bitrate averages:: input: 96.09 KB, output: 46.74 KB.

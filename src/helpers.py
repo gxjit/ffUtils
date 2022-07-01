@@ -1,15 +1,14 @@
 import math
-from datetime import timedelta
-from shutil import which
-from subprocess import run
-from traceback import format_exc
 from collections.abc import Iterable
-from pathlib import Path
-from zlib import adler32
-from time import time
+from datetime import timedelta
 from functools import reduce
 from operator import getitem
-
+from pathlib import Path
+from shutil import which
+from subprocess import run
+from time import time
+from traceback import format_exc
+from zlib import adler32
 
 round2 = lambda x: round(float(x), ndigits=2)
 
@@ -101,6 +100,16 @@ def removeFiles(files):
             removeFile(f)
 
 
+def extractKeysDict(dic, keys, asDict=False):
+    if isinstance(keys, str):
+        return dic.get(keys, "N/A")
+    elif isinstance(keys, Iterable):
+        if asDict:
+            return {k: dic.get(k, "N/A") for k in keys}
+        else:
+            return [dic.get(k, "N/A") for k in keys]
+
+
 def readableDict(dic):
     return "".join([f"{k}: {v}; " for k, v in dic.items()])
 
@@ -122,3 +131,10 @@ def trackTime(func):
     funcOut = func()
     timeTaken = float(time() - strtTime)
     return (funcOut, timeTaken)
+
+
+def appendFile(file, contents):
+    # if not file.exists():
+    #     file.touch()
+    with open(file, "a") as f:
+        f.write(str(contents))

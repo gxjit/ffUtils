@@ -90,7 +90,7 @@ def concatSplits(ffmpegPath, splitsFile, tmpFiles, outFile):
         removeFiles([splitsFile, *tmpFiles])
 
 
-def go(file, pargs, ffmpegPath, ffprobePath):
+def mainLoop(file, pargs, ffmpegPath, ffprobePath):
     outFile = file.with_name(f"trm_{file.name}")  # outfiles?
     metaData = getMetaData(ffprobePath, file)
     duration = getFormatKeys(metaData, "duration")
@@ -107,9 +107,9 @@ def main():
     if pargs.only:
         fileList = fileList[: pargs.only]
 
-    goP = lambda f: go(f, pargs, ffmpegPath, ffprobePath)
+    mainLoopP = lambda f: mainLoop(f, pargs, ffmpegPath, ffprobePath)
 
-    emap(goP, fileList)
+    emap(mainLoopP, fileList)
 
 
 main()
