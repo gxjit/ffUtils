@@ -46,14 +46,20 @@ def parseArgs():
         "--res",
         default=720,
         type=int,
-        help="Limit video resolution; can be 480, 540, 720, etc. (default: 720)",
+        help=(
+            "Limit video resolution; can be 480, 540, 720, etc."
+            " (default: 720, disable: 0)"
+        ),
     )
     parser.add_argument(
         "-fr",
         "--fps",
         default=30,
         type=int,
-        help="Limit video frame rate; can be 24, 25, 30, 60, etc. (default: 30)",
+        help=(
+            "Limit video frame rate; can be 24, 25, 30, 60, etc."
+            " (default: 30, disable: 0)"
+        ),
     )
     parser.add_argument(
         "-s",
@@ -179,8 +185,10 @@ def mainLoop(file, pargs, ffmpegPath, ffprobePath):
 
     videoMetaOut = getSlctMetaP(outFile, "video")
 
-    # print(f"\nVideo Input:: {readableDict(readableKeys(videoMetaIn))}")
-    # print(f"\nVideo Output:: {readableDict(readableKeys(videoMetaOut))}")
+    print(
+        f"\n\nVideo Input:: {readableDict(readableKeys(videoMetaIn))}"
+        f"\nVideo Output:: {readableDict(readableKeys(videoMetaOut))}"
+    )
 
     return {
         "cmd": cmd,

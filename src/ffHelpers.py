@@ -217,11 +217,13 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
         "vfr",
     ]
 
-    if float(Fraction(srcFps)) > limitFps:
-        opts = [*opts, "-r", str(limitFps)]
+    if limitFps:
+        if float(Fraction(srcFps)) > limitFps:
+            opts = [*opts, "-r", str(limitFps)]
 
-    if int(srcRes) > limitRes:
-        opts = [*opts, "-vf", f"scale=-2:{str(limitRes)}"]
+    if limitRes:
+        if int(srcRes) > limitRes:
+            opts = [*opts, "-vf", f"scale=-2:{str(limitRes)}"]
 
     return opts
 
