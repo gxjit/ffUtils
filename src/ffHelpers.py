@@ -113,13 +113,14 @@ def getSlctMeta(ffprobePath, file, slctMeta, cdcType):
     )
 
 def readableKeys(meta):
+    retr = {}
     bitR = meta.get("bit_rate")
     if bitR:
-        meta["bit_rate"] = readableSize(float(bitR))
+        retr = {**meta, "bit_rate": readableSize(float(bitR))}
     dur = meta.get("duration")
     if dur:
-        meta["duration"] = readableTime(float(dur))
-    return meta
+        retr = {**retr, "duration": readableTime(float(dur))}
+    return retr
 
 
 def selectCodec(codec, quality=None, speed=None):

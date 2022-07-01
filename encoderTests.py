@@ -25,8 +25,8 @@ from src.helpers import (
     trackTime,
     readableTime,
     readableSize,
+    readableDict,
     round2,
-    collectAtKey,
 )
 
 # Note: WIP
@@ -120,17 +120,50 @@ def meta(cType=None):
         return basic
 
 
-# Format: nb_streams, duration, bit_rate, format_name, format_long_name
-
-# def getStats(stats):
-#     return
-
-
 if pargs.dry:
     runCmd = print
 
-def getStats():
-    pass
+# Format: nb_streams, duration, bit_rate, format_name, format_long_name
+
+
+def getStats(stats):
+    times = [float(x["timeTaken"]) for x in stats]
+    inSizes = [float(x["input"]["size"]) for x in stats]
+    # times = collectAtKey(stats, ["timeTaken"])
+    # inSizes = collectAtKey(stats, ["input", "size"])
+    outSizes = [float(x["output"]["size"]) for x in stats]
+    lenghts = [float(x["input"]["meta"]["duration"]) for x in stats]
+    bitsIn = [float(x["input"]["meta"]["bit_rate"]) for x in stats]
+    bitsOut = [float(x["output"]["meta"]["bit_rate"]) for x in stats]
+    inSum, inMean = sum(inSizes), fmean(inSizes)
+    outSum, outMean = sum(outSizes), fmean(outSizes)
+    sumTimes, meanTimes = sum(times), fmean(times)
+    sumLengths, meanLengths = sum(lenghts), fmean(lenghts)
+    bitsInMean, bitsOutMean = fmean(bitsIn), fmean(bitsOut)
+
+    return (
+        "\n"
+        f"Size averages:: Reduction: {round2(((inMean-outMean)/inMean)*100)}%"
+        f", Input: {(readableSize(inMean))}"
+        f", Output: {(readableSize(outMean))}."
+        "\n"
+        f"Size totals:: Reduction: {(readableSize(inSum-outSum))}"
+        f", Input: {readableSize(inSum)}"
+        f", Output: {readableSize(outSum)}."
+        "\n"
+        f"Processing averages:: Speed: x{round2(meanLengths/meanTimes)}"
+        f", Time: {readableTime(meanTimes)}"
+        f", Length: {readableTime(meanLengths)}."
+        "\n"
+        f"Processing totals:: Files: {len(stats)}"
+        f", Time: {readableTime(sumTimes)}"
+        f", Length: {readableTime(sumLengths)}."
+        "\n"
+        f"Video bitrate averages:: Reduction: {round2(((bitsInMean-bitsOutMean)/bitsInMean)*100)}%"
+        f", Input: {(readableSize(bitsInMean))}"
+        f", Output: {(readableSize(bitsOutMean))}."
+    )
+
 
 def mainLoop(file):
     outFile = file.with_name(f"{pargs.cVideo}_{pargs.qVideo}_{pargs.speed}_{file.name}")
@@ -148,6 +181,10 @@ def mainLoop(file):
     cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
 
     videoMetaOut = getSlctMetaP(outFile, "video")
+
+    # print(f"\nVideo Input:: {readableDict(readableKeys(videoMetaIn))}")
+    # print(f"\nVideo Output:: {readableDict(readableKeys(videoMetaOut))}")
+
     return {
         "cmd": cmd,
         "timeTaken": timeTaken,
@@ -176,50 +213,22 @@ def main():
 
     stats = emap(mainLoop, fileList)
 
-    times = [float(x["timeTaken"]) for x in stats]
-    inSizes = [float(x["input"]["size"]) for x in stats]
-    # times = collectAtKey(stats, ["timeTaken"])
-    # inSizes = collectAtKey(stats, ["input", "size"])
-    outSizes = [float(x["output"]["size"]) for x in stats]
-    lenghts = [float(x["input"]["meta"]["duration"]) for x in stats]
-    bitsIn = [float(x["input"]["meta"]["bit_rate"]) for x in stats]
-    bitsOut = [float(x["output"]["meta"]["bit_rate"]) for x in stats]
-    inSum, inMean = sum(inSizes), fmean(inSizes)
-    outSum, outMean = sum(outSizes), fmean(outSizes)
-    sumTimes, meanTimes = sum(times), fmean(times)
-    sumLengths, meanlengths = sum(lenghts), fmean(lenghts)
-    bitsInMean, bitsOutMean = fmean(bitsIn), fmean(bitsOut)
-
-    printStats = (
-        "\n"
-        f"Processed {len(fileList)} file(s): {readableTime(sumLengths)}/{readableSize(inSum)}"
-        f" in: {readableTime(sumTimes)}/{readableSize(outSum)}"
-        f" at speed: x{round2(sumLengths/sumTimes)}."
-        "\n"
-        f"Total size reduced by: {(readableSize(inSum-outSum))} "
-        f"to {(readableSize(outSum))} at an average of:"
-        f" {round2(((inMean-outMean)/inMean)*100)}% size reduction."
-        "\n"
-        f"Average processing time: {readableTime(meanTimes)} "
-        f"& average speed: x{round2(meanlengths/meanTimes)}."
-        "\n"
-        f"Average input size: {(readableSize(inMean))}"
-        f" & average output size: {(readableSize(outMean))}."
-        "\n"
-        f"Average input bitrate: {(readableSize(bitsInMean))}"
-        f" & average output bitrate: {(readableSize(bitsOutMean))}."
-    )
-
-    print(printStats)
+    print(getStats(stats))
 
     # logFile.write_text()
-    # readableKeys(videoMetaIn)
+    #
 
 
 main()
 
-# Processed 2 file(s): 0:00:19/585.32 KB in: 0:00:12/289.66 KB at speed: x1.52.
-# Total size reduced by: 295.66 KB to 289.66 KB at an average of: 50.51% size reduction.
-# Average processing time: 0:00:06 & average speed: x1.52.
-# Average input size: 292.66 KB & average output size: 144.83 KB.
-# Average input bitrate: 96.09 KB & average output bitrate: 52.62 KB.
+# Size averages:: Reduction: 52.95%, Input: 292.66 KB, Output: 137.71 KB.
+# Size totals:: Reduction: 309.91 KB, Input: 585.32 KB, Output: 275.41 KB.
+# Processing averages:: Speed: x2.16, Time: 0:00:04, Length: 0:00:09.
+# Processing totals:: Files: 2, Time: 0:00:08, Length: 0:00:19.
+# Bitrate averages:: Reduction: 51.35%, Input: 96.09 KB, Output: 46.74 KB.
+
+# Processed 2 file(s) at average speed: x2.17 with 52.95% average size reduction.
+# Processed 0:00:19 in 0:00:08 at average processing time: 0:00:04.
+# Size Reduction from: 585.32 KB to: 275.41 KB by: 309.91 KB.
+# Size averages:: input: 292.66 KB, output: 137.71 KB
+# Bitrate averages:: input: 96.09 KB, output: 46.74 KB.
