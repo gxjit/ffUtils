@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from src.cliHelpers import addCliDir, addCliDry, addCliRec, sepExts
+from src.cliHelpers import addCliDir, addCliDry, addCliRec,     addCliExt
 from src.ffHelpers import ffmpegConcatCmd, ffmpegTrimCmd, getFormatKeys, getMetaData
 from src.helpers import (
     checkPaths,
@@ -25,13 +25,7 @@ def parseArgs():
     parser = addCliDir(parser)
     parser = addCliRec(parser)
     parser = addCliDry(parser)
-    parser.add_argument(
-        "-e",
-        "--extensions",
-        default=(".mp4", ".mov"),
-        help="Comma separated file extensions. (default: .mp4, .mov)",
-        type=sepExts,
-    )
+    parser = addCliExt(parser, (".mp4", ".mov"))
     parser.add_argument(
         "-l",
         "--length",

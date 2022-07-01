@@ -166,7 +166,6 @@ def getStats(stats):
 
 
 def mainLoop(file):
-    outFile = file.with_name(f"{pargs.cVideo}_{pargs.qVideo}_{pargs.speed}_{file.name}")
 
     getSlctMetaP = lambda f, cdc: getSlctMeta(ffprobePath, f, meta, cdc)
     videoMetaIn = getSlctMetaP(file, "video")
@@ -175,7 +174,11 @@ def mainLoop(file):
         videoMetaIn["height"], videoMetaIn["r_frame_rate"], pargs.res, pargs.fps
     )
     ca = selectCodec(pargs.cAudio, pargs.qAudio)
+
+    outFile = file.with_name(f"{pargs.cVideo}_{cv[5]}_{cv[3]}_{file.name}")
+
     cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
+
     cmd = getffmpegCmd(ffmpegPath, file, outFile, ca, cv, ov)
 
     cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
