@@ -17,6 +17,7 @@ from src.ffHelpers import (
     selectCodec,
 )
 from src.helpers import (
+    appendFile,
     checkPaths,
     emap,
     exitIfEmpty,
@@ -139,6 +140,13 @@ def getStats(results):
     lenghts = [float(x["input"]["meta"]["video"]["duration"]) for x in results]
     VidBitsIn = [float(x["input"]["meta"]["video"]["bit_rate"]) for x in results]
     VidBitsOut = [float(x["output"]["meta"]["video"]["bit_rate"]) for x in results]
+    log = lambda x: (
+        f'\nProcessed file: {x["input"]["file"].name}'
+        f'\nVideo Input:: {readableDict(readableKeys(x["input"]["meta"]["video"]))}'
+        f'\nVideo Output:: {readableDict(readableKeys(x["output"]["meta"]["video"]))}'
+    )
+    logs = "\n".join([log(x) for x in results])
+
     inSum, inMean = sum(inSizes), fmean(inSizes)
     outSum, outMean = sum(outSizes), fmean(outSizes)
     sumTimes, meanTimes = sum(times), fmean(times)
@@ -166,6 +174,7 @@ def getStats(results):
         f"Video bitrate averages:: Reduction: {round2(((VidBitsInMean-VidBitsOutMean)/VidBitsInMean)*100)}%"
         f", Input: {(readableSize(VidBitsInMean))}"
         f" & Output: {(readableSize(VidBitsOutMean))}."
+        f"\n{logs}"
     )
 
 
@@ -186,21 +195,17 @@ def mainLoop(file, pargs, ffmpegPath, ffprobePath):
     cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
 
     videoMetaOut = getSlctMetaP(outFile, "video")
-    print(
-        f"\nVideo Input:: {readableDict(readableKeys(videoMetaIn))}"
-        f"\nVideo Output:: {readableDict(readableKeys(videoMetaOut))}"
-    )
 
     return {
         "cmd": cmd,
         "timeTaken": timeTaken,
         "input": {
-            "file": str(file),
+            "file": file,
             "size": file.stat().st_size,
             "meta": {"video": videoMetaIn},
         },
         "output": {
-            "file": str(outFile),
+            "file": outFile,
             "size": outFile.stat().st_size,
             "meta": {"video": videoMetaOut},
         },
@@ -221,8 +226,8 @@ def main():
 
     print(stats)
 
-    # logFile = dirPath / f"{dirPath.name}.log"
-    # appendFile(logFile, stats)
+    logFile = dirPath / f"{dirPath.name}.log"
+    appendFile(logFile, stats)
 
 
 main()

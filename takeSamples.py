@@ -36,7 +36,7 @@ def parseArgs():
     parser.add_argument(
         "-s",
         "--samples",
-        default=5,
+        default=4,
         type=int,
         help="Number of samples samples.",
     )
