@@ -1,3 +1,10 @@
+# Format: nb_streams, duration, bit_rate, format_name, format_long_name
+# Audio: codec_name, codec_type, sample_rate, channels
+# Video: codec_name, codec_type, height, r_frame_rate, pix_fmt
+# sum: duration
+# median: duration, bit_rate,
+# mode: codec_name
+
 # Size averages:: Reduction: 52.95%, Input: 292.66 KB, Output: 137.71 KB.
 # Size totals:: Reduction: 309.91 KB, Input: 585.32 KB, Output: 275.41 KB.
 # Processing averages:: Speed: x2.16, Time: 0:00:04, Length: 0:00:09.

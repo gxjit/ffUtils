@@ -77,10 +77,3 @@ print(
     f"Mode Number of Streams: {int(modeStreams)}"
 )
 
-
-# Format: nb_streams, duration, bit_rate, format_name, format_long_name
-# Audio: codec_name, codec_type, sample_rate, channels
-# Video: codec_name, codec_type, height, r_frame_rate, pix_fmt
-# sum: duration
-# median: duration, bit_rate,
-# mode: codec_name

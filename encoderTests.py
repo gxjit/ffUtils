@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from statistics import fmean
+from functools import reduce
 
 from src.cliHelpers import (
     addCliDir,
@@ -140,12 +141,6 @@ def getStats(results):
     lenghts = [float(x["input"]["meta"]["video"]["duration"]) for x in results]
     VidBitsIn = [float(x["input"]["meta"]["video"]["bit_rate"]) for x in results]
     VidBitsOut = [float(x["output"]["meta"]["video"]["bit_rate"]) for x in results]
-    log = lambda x: (
-        f'\nProcessed file: {x["input"]["file"].name}'
-        f'\nVideo Input:: {readableDict(readableKeys(x["input"]["meta"]["video"]))}'
-        f'\nVideo Output:: {readableDict(readableKeys(x["output"]["meta"]["video"]))}'
-    )
-    logs = "\n".join([log(x) for x in results])
 
     inSum, inMean = sum(inSizes), fmean(inSizes)
     outSum, outMean = sum(outSizes), fmean(outSizes)
@@ -154,7 +149,11 @@ def getStats(results):
     VidBitsInMean, VidBitsOutMean = fmean(VidBitsIn), fmean(VidBitsOut)
 
     return (
-        "\n"
+        f"\n"
+        f'\nProcessed file: {results[-1]["input"]["file"].name}'
+        f'\nVideo Input:: {readableDict(readableKeys(results[-1]["input"]["meta"]["video"]))}'
+        f'\nVideo Output:: {readableDict(readableKeys(results[-1]["output"]["meta"]["video"]))}'
+        "\n\n"
         f"Size averages:: Reduction: {round2(((inMean-outMean)/inMean)*100)}%"
         f", Input: {(readableSize(inMean))}"
         f" & Output: {(readableSize(outMean))}."
@@ -174,11 +173,10 @@ def getStats(results):
         f"Video bitrate averages:: Reduction: {round2(((VidBitsInMean-VidBitsOutMean)/VidBitsInMean)*100)}%"
         f", Input: {(readableSize(VidBitsInMean))}"
         f" & Output: {(readableSize(VidBitsOutMean))}."
-        f"\n{logs}"
     )
 
 
-def mainLoop(file, pargs, ffmpegPath, ffprobePath):
+def mainLoop(acc, file, dirPath, pargs, ffmpegPath, ffprobePath):
     getSlctMetaP = lambda f, cdc: getSlctMeta(ffprobePath, f, meta, cdc)
     videoMetaIn = getSlctMetaP(file, "video")
 
@@ -187,29 +185,39 @@ def mainLoop(file, pargs, ffmpegPath, ffprobePath):
     )
     ca = selectCodec(pargs.cAudio, pargs.qAudio)
     cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
-    outFile = file.with_name(
-        f"{(cv[1]).replace('lib', '')}_{cv[5]}_{cv[3]}_{file.name}"
-    )
+    fmtName = f"{(cv[1]).replace('lib', '')}_{cv[5]}_{cv[3]}"
+    outFile = file.with_name(f"{fmtName}_{file.name}")
+    logFile = dirPath / f"{fmtName}_{dirPath.name}.log"
+
     cmd = getffmpegCmd(ffmpegPath, file, outFile, ca, cv, ov)
 
     cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
 
     videoMetaOut = getSlctMetaP(outFile, "video")
 
-    return {
-        "cmd": cmd,
-        "timeTaken": timeTaken,
-        "input": {
-            "file": file,
-            "size": file.stat().st_size,
-            "meta": {"video": videoMetaIn},
+    results = [
+        *acc,
+        {
+            "cmd": cmd,
+            "timeTaken": timeTaken,
+            "input": {
+                "file": file,
+                "size": file.stat().st_size,
+                "meta": {"video": videoMetaIn},
+            },
+            "output": {
+                "file": outFile,
+                "size": outFile.stat().st_size,
+                "meta": {"video": videoMetaOut},
+            },
         },
-        "output": {
-            "file": outFile,
-            "size": outFile.stat().st_size,
-            "meta": {"video": videoMetaOut},
-        },
-    }
+    ]
+
+    stats = getStats(results)
+    print(stats)
+    appendFile(logFile, stats)
+
+    return results
 
 
 def main():
@@ -220,14 +228,8 @@ def main():
     if pargs.only:
         fileList = fileList[: pargs.only]
 
-    mainLoopP = lambda f: mainLoop(f, pargs, ffmpegPath, ffprobePath)
-    results = emap(mainLoopP, fileList)
-    stats = getStats(results)
-
-    print(stats)
-
-    logFile = dirPath / f"{dirPath.name}.log"
-    appendFile(logFile, stats)
+    mainLoopP = lambda acc, f: mainLoop(acc, f, dirPath, pargs, ffmpegPath, ffprobePath)
+    results = reduce(mainLoopP, fileList, [])
 
 
 main()
