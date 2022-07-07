@@ -1,5 +1,4 @@
 import math
-from collections.abc import Iterable
 from datetime import timedelta
 from functools import reduce
 from operator import getitem
@@ -14,8 +13,6 @@ round2 = lambda x: round(float(x), ndigits=2)
 
 readableTime = lambda sec: str(timedelta(seconds=sec)).split(".")[0]
 
-collectAtIndex = lambda itr, idx: [x[idx] for x in itr]
-
 emap = lambda func, itr: tuple(map(func, itr))
 
 efilter = lambda func, itr: tuple(filter(func, itr))
@@ -23,6 +20,8 @@ efilter = lambda func, itr: tuple(filter(func, itr))
 range1 = lambda l, f=1, s=1: range(f, l + 1, s)
 
 strSum = lambda datum: adler32(datum.encode("utf8"))
+
+collectAtIndex = lambda itr, idx: [x[idx] for x in itr]
 
 getByPath = lambda root, keys: reduce(getitem, keys, root)
 
@@ -62,10 +61,7 @@ def checkPaths(paths):
 
 def checkExceptions(output):
     for o in iter(output):
-        if isinstance(o, Exception):
-            reportErrExit(o)
-        else:
-            return o
+        return o if not isinstance(o, Exception) else reportErrExit(o)
 
 
 def getFileList(dirPath, exts, rec=False):
@@ -95,19 +91,44 @@ def removeFile(file):
 
 
 def removeFiles(files):
-    if isinstance(files, Iterable) and not isinstance(files, str):
+    if isinstance(files, (list, tuple)) and not isinstance(files, str):
         for f in files:
             removeFile(f)
 
 
+def rmEmptyDir(path):
+    if isinstance(path, Path) and path.exists():
+        if path.is_dir() and not list(path.iterdir()):
+            path.rmdir()
+
+
+def rmEmptyDirs(paths):
+    if isinstance(paths, (list, tuple)) and not isinstance(paths, str):
+        for path in paths:
+            rmEmptyDir(path)
+
+
+def makeTargetDir(dirPath):
+    if not dirPath.exists():
+        dirPath.mkdir()
+    return dirPath
+
+
+def makeTargetDirs(dirPath, names=None):
+    if names:
+        return [makeTargetDir(dirPath / n) for n in names]
+    else:
+        return makeTargetDir(dirPath)
+
+
 def extractKeysDict(dic, keys, asDict=False):
     if isinstance(keys, str):
-        return dic.get(keys, "N/A")
-    elif isinstance(keys, Iterable):
+        return dic.get(keys)
+    elif isinstance(keys, (list, tuple)):
         if asDict:
-            return {k: dic.get(k, "N/A") for k in keys}
+            return {k: dic[k] for k in keys if dic.get(k)}
         else:
-            return [dic.get(k, "N/A") for k in keys]
+            return [dic[k] for k in keys if dic.get(k)]
 
 
 def readableDict(dic):
@@ -126,9 +147,9 @@ def readableSize(sBytes):
     return f"{s} {sName[i]}"
 
 
-def trackTime(func):
+def trackTime(func, *funcArgs):
     strtTime = time()
-    funcOut = func()
+    funcOut = func(*funcArgs)
     timeTaken = float(time() - strtTime)
     return (funcOut, timeTaken)
 
@@ -138,3 +159,12 @@ def appendFile(file, contents):
     #     file.touch()
     with open(file, "a") as f:
         f.write(str(contents))
+
+
+def cleanUp(paths):
+    for path in paths:
+        if path.exists():
+            if path.is_dir():
+                rmEmptyDir(path)
+            elif path.is_file():
+                removeFile(path)

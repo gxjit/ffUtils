@@ -73,3 +73,14 @@ def addCliExt(parser, defaults=None):
         type=sepExts,
     )
     return parser
+
+def addCliWait(parser, dft=10):
+    parser.add_argument(
+        "-w",
+        "--wait",
+        nargs="?",
+        default=None,
+        const=dft,
+        type=int,
+        help=f"Wait time in seconds between each iteration, default is {dft}",
+    )

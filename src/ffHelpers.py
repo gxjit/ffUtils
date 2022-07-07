@@ -37,7 +37,7 @@ ffmpegTrimCmd = lambda ffmpegPath, file, outFile, start, length: [
     str(outFile),
 ]
 
-getffmpegCmd = lambda ffmpegPath, file, outFile, ca, cv, ov=[]: [
+getffmpegCmd = lambda ffmpegPath, file, outFile, ca=[], cv=[], ov=[]: [
     ffmpegPath,
     "-i",
     str(file),
@@ -72,6 +72,40 @@ def getMetaData(ffprobePath, file):
     return metaData
 
 
+def findStream(meta, sType):
+    nbStreams = int(meta["format"]["nb_streams"])
+    strms = meta["streams"]
+    for strm in range(nbStreams):
+        cType = strms[strm].get("codec_type")
+        if cType == sType:
+            return strm
+    return None
+
+
+def getFormatData(meta):
+    return meta["format"]
+
+
+def getStreamData(meta, strm):
+    return meta["streams"][strm] if strm is not None else None
+
+
+def getMeta(ffprobePath, file, cdcType=None, fmt=True):
+    metaData = getMetaData(ffprobePath, file)
+    fmtData = getFormatData(metaData)
+    if cdcType is None:
+        return fmtData
+    elif isinstance(cdcType, str):
+        strm = findStream(metaData, cdcType)
+        strmData = getStreamData(metaData, strm)
+        return (fmtData, strmData) if fmt else strmData
+    elif isinstance(cdcType, (list, tuple)):
+        strmData = [
+            getStreamData(metaData, findStream(metaData, cdc)) for cdc in cdcType
+        ]
+        return (fmtData, *strmData) if fmt else strmData
+
+
 def getFormatKeys(meta, keys, asDict=False):
     fmt = meta["format"]
     return extractKeysDict(fmt, keys, asDict)
@@ -87,19 +121,42 @@ def getTagKeys(meta, keys, asDict=False):
     return extractKeysDict(tags, keys, asDict)
 
 
-def findStream(meta, sType):
-    nbStreams = int(meta["format"]["nb_streams"])
-    for strm in range(nbStreams):
-        cType = getStreamKeys(meta, strm, "codec_type")
-        if cType == sType:
-            return strm
+# def getStreamData(metaData, strm, meta):
+#     if strm is None:
+#         return None
+#     else:
+#         return getStreamKeys(metaData, strm, meta, asDict=True)
 
 
-def getSlctMeta(ffprobePath, file, slctMeta, cdcType):
-    metaData = getMetaData(ffprobePath, file)
-    return getStreamKeys(
-        metaData, findStream(metaData, cdcType), slctMeta(cdcType), asDict=True
-    )
+# def getFormatData(metaData):
+#     getFormatKeys(
+#         metaData, ("format_name", "nb_streams", "duration", "bit_rate"), asDict=True
+#     )
+
+
+# def getSlctMeta(ffprobePath, file, meta=None, cdcType=None, fmt=True):
+#     metaData = getMetaData(ffprobePath, file)
+#     fmtData = getFormatData(metaData)
+#     if cdcType is None:
+#         return fmtData
+#     elif isinstance(cdcType, str):
+#         strm = findStream(metaData, cdcType)
+#         strmData = getStreamData(metaData, strm, meta)
+#         if fmt:
+#             return (fmtData, strmData)
+#         else:
+#             return strmData
+#     elif isinstance(cdcType, (list, tuple)):
+#         strmData = [
+#             getStreamData(metaData, findStream(metaData, cdc), meta) for cdc in cdcType
+#         ]
+#         if fmt:
+#             return (
+#                 fmtData,
+#                 *strmData,
+#             )
+#         else:
+#             return strmData
 
 
 def readableKeys(meta):
@@ -111,6 +168,17 @@ def readableKeys(meta):
     if dur:
         retr = {**retr, "duration": readableTime(float(dur))}
     return retr
+
+
+def selectFormat(codec):
+    if codec in ("aac", "he"):
+        return ".m4a"
+    elif codec in ("opus"):
+        return ".opus"
+    elif codec in ("hevc", "avc", "av1"):
+        return ".mp4"
+    else:
+        return (".m4a", ".opus", ".mp4")
 
 
 def selectCodec(codec, quality=None, speed=None):
@@ -203,7 +271,7 @@ def selectCodec(codec, quality=None, speed=None):
             speed or "8",
             "-g",
             "240",
-        ]  # -g fps*10
+        ]
 
     return cdc
 
@@ -215,7 +283,7 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
         "yuv420p",
         "-vsync",
         "vfr",
-    ]
+    ]  # -g fps*10
 
     if limitFps:
         if float(Fraction(srcFps)) > limitFps:
@@ -226,6 +294,26 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
             opts = [*opts, "-vf", f"scale=-2:{str(limitRes)}"]
 
     return opts
+
+
+def floatDiff(src, out, n=1):
+    try:
+        diff = abs(float(src) - float(out))
+    except ValueError:
+        return None
+    return diff if diff > n else False
+
+# def compDur():
+#     pass
+
+
+# if diff:
+#     msg = f"\n\nINFO: Mismatched {strmType} source and output duration."
+# msg = (
+#     f"\n********\nWARNING: Differnce between {strmType} source and output "
+#     f"durations({str(round2(diff))} seconds) is more than {str(n)} second(s).\n"
+# )
+# printNLog(msg)
 
 
 # streams=False "-show_streams" if streams else *[]

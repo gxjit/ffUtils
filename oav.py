@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
-from statistics import fmean
+from atexit import register as atexit
 from functools import reduce
+from statistics import fmean
+from sys import version_info
 
 from src.cliHelpers import (
     addCliDir,
@@ -8,26 +10,31 @@ from src.cliHelpers import (
     addCliExt,
     addCliOnly,
     addCliRec,
+    addCliWait,
     checkValIn,
 )
 from src.ffHelpers import (
+    floatDiff,
     getffmpegCmd,
-    getSlctMeta,
+    getMeta,
     optsVideo,
     readableKeys,
     selectCodec,
+    selectFormat,
 )
 from src.helpers import (
     appendFile,
     checkPaths,
-    emap,
+    cleanUp,
     exitIfEmpty,
     getFileList,
+    makeTargetDir,
     readableDict,
     readableSize,
     readableTime,
     round2,
     runCmd,
+    strSum,
     trackTime,
 )
 
@@ -36,13 +43,20 @@ def parseArgs():
 
     aCodec = lambda v: checkValIn(v, ["opus", "he", "aac", "ac"], str)
     vCodec = lambda v: checkValIn(v, ["avc", "hevc", "av1", "vn", "vc"], str)
+    inExts = (
+        *(".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv"),
+        *(".flac", ".wav", ".m4a", ".mp3"),
+    )
 
-    parser = ArgumentParser(description="FFmpeg Video/Audio Encoder testing.")
+    parser = ArgumentParser(
+        description="Optimize Video/Audio files by encoding to avc/hevc/aac/opus."
+    )
     parser = addCliDir(parser)
     parser = addCliRec(parser)
     parser = addCliDry(parser)
     parser = addCliOnly(parser)
-    parser = addCliExt(parser, (".mp4", ".mov"))
+    parser = addCliExt(parser, inExts)
+    parser = addCliWait(parser)
     parser.add_argument(
         "-rs",
         "--res",
@@ -103,17 +117,28 @@ def parseArgs():
         type=int,
         help="Audio Quality/bitrate in kbps; (defaults:: opus: 48, he: 56 and aac: 72)",
     )
+    parser.add_argument(
+        "-fm",
+        "--format",
+        action="store_true",
+        help="Use metadata from container format for duration comparison.",
+    )
+    # parser.add_argument(
+    #     "-fa",
+    #     "--fAudio",
+    #     default="m4a",
+    #     type=aCodec,
+    #     help="Audio container format; can be m4a, opus, etc. (default: m4a)",
+    # )
+    # parser.add_argument(
+    #     "-fv",
+    #     "--fVideo",
+    #     default="mp4",
+    #     type=aCodec,
+    #     help="Video container format; can be mp4, mkv, etc. (default: mp4)",
+    # )
+
     return parser.parse_args()
-
-
-pargs = parseArgs()
-
-ffprobePath, ffmpegPath = checkPaths(
-    {
-        "ffprobe": r"D:\PortableApps\bin\ffprobe.exe",
-        "ffmpeg": r"D:\PortableApps\bin\ffmpeg.exe",
-    }
-)
 
 
 def meta(cType=None):
@@ -125,9 +150,6 @@ def meta(cType=None):
     else:
         return basic
 
-
-if pargs.dry:
-    runCmd = print
 
 # Format: nb_streams, duration, bit_rate, format_name, format_long_name
 
@@ -151,8 +173,8 @@ def getStats(results):
     return (
         f"\n"
         f'\nProcessed file: {results[-1]["input"]["file"].name}'
-        f'\nVideo Input:: {readableDict(readableKeys(results[-1]["input"]["meta"]["video"]))}'
-        f'\nVideo Output:: {readableDict(readableKeys(results[-1]["output"]["meta"]["video"]))}'
+        f'\nVideo Input:: {readableDict(readableKeys(results[-1]["input"]["meta"]["video"]))}'  # noqa
+        f'\nVideo Output:: {readableDict(readableKeys(results[-1]["output"]["meta"]["video"]))}'  # noqa
         "\n\n"
         f"Size averages:: Reduction: {round2(((inMean-outMean)/inMean)*100)}%"
         f", Input: {(readableSize(inMean))}"
@@ -171,30 +193,56 @@ def getStats(results):
         f", Time: {readableTime(sumTimes)}"
         f" & Length: {readableTime(sumLengths)}."
         "\n"
-        f"Video bitrate averages:: Reduction: {round2(((VidBitsInMean-VidBitsOutMean)/VidBitsInMean)*100)}%"
+        f"Video bitrate averages:: Reduction: {round2(((VidBitsInMean-VidBitsOutMean)/VidBitsInMean)*100)}%"  # noqa
         f", Input: {(readableSize(VidBitsInMean))}"
         f" & Output: {(readableSize(VidBitsOutMean))}."
     )
 
 
-def mainLoop(acc, file, dirPath, pargs, ffmpegPath, ffprobePath):
-    getSlctMetaP = lambda f, cdc: getSlctMeta(ffprobePath, f, meta(cdc), cdc, fmt=False)
-    videoMetaIn = getSlctMetaP(file, "video")
+def mainLoop(acc, files, addFiles, pargs, ffmpegPath, ffprobePath):
+    file, outFile = files
+    tmpFile, logFile = addFiles
+    getMetaP = lambda f, cdc: getMeta(ffprobePath, f, cdc)
+    fmtIn, videoMetaIn, audioMetaIn = getMetaP(file, ("video", "audio"))
 
-    ov = optsVideo(
-        videoMetaIn["height"], videoMetaIn["r_frame_rate"], pargs.res, pargs.fps
-    )
-    ca = selectCodec(pargs.cAudio, pargs.qAudio)
-    cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
-    fmtName = f"{(cv[1]).replace('lib', '')}_{cv[5]}_{cv[3]}"
-    outFile = file.with_name(f"{fmtName}_{file.name}")
-    logFile = dirPath / f"{fmtName}_{dirPath.name}.log"
+    if videoMetaIn:
+        ov = optsVideo(
+            videoMetaIn["height"], videoMetaIn["r_frame_rate"], pargs.res, pargs.fps
+        )
+        cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
+        outExt = selectFormat(pargs.cVideo)
+    else:
+        ov, cv = [], []
+        outExt = selectFormat(pargs.cAudio)
 
-    cmd = getffmpegCmd(ffmpegPath, file, outFile, ca, cv, ov)
+    ca = selectCodec(pargs.cAudio, pargs.qAudio) if audioMetaIn else []
+    # outExt = selectFormat()
+    tmpFile = tmpFile.with_suffix(outExt)
+    outFile = outFile.with_suffix(outExt)
+    cmd = getffmpegCmd(ffmpegPath, file, tmpFile, ca, cv, ov)
 
-    cmdOut, timeTaken = trackTime(lambda: runCmd(cmd))
+    cmdOut, timeTaken = trackTime(runCmd, cmd)
 
-    videoMetaOut = getSlctMetaP(outFile, "video")
+    if pargs.recursive and not outFile.parent.exists():
+        outFile.parent.mkdir(parents=True)
+    tmpFile.rename(outFile)
+
+    fmtOut, videoMetaOut, audioMetaOut = getMetaP(outFile, ("video", "audio"))
+
+    vdoDur = videoMetaIn and videoMetaIn.get("duration")
+    adoDur = audioMetaIn and audioMetaIn.get("duration")
+    if vdoDur:
+        vDiff = (floatDiff(vdoDur, videoMetaOut["duration"]), "video")
+    elif adoDur:
+        vDiff = (floatDiff(adoDur, audioMetaOut["duration"]), "audio")
+    else:
+        vDiff = (floatDiff(fmtIn["duration"], fmtOut["duration"]), "format")
+    if vDiff:
+        diff, src = vDiff
+        print(
+            f"\n********\nWARNING: Differnce between {src} source and output "
+            f"durations is {str(round2(diff))} second(s).\n"
+        )
 
     results = [
         *acc,
@@ -204,12 +252,12 @@ def mainLoop(acc, file, dirPath, pargs, ffmpegPath, ffprobePath):
             "input": {
                 "file": file,
                 "size": file.stat().st_size,
-                "meta": {"video": videoMetaIn},
+                "meta": {"video": videoMetaIn, "audio": audioMetaIn},
             },
             "output": {
                 "file": outFile,
                 "size": outFile.stat().st_size,
-                "meta": {"video": videoMetaOut},
+                "meta": {"video": videoMetaOut, "audio": audioMetaOut},
             },
         },
     ]
@@ -218,19 +266,61 @@ def mainLoop(acc, file, dirPath, pargs, ffmpegPath, ffprobePath):
     print(stats)
     appendFile(logFile, stats)
 
+    # if pargs.wait:
+    #     waitN(int(pargs.wait))
+    # else:
+    #     waitN(int(dynWait(timeTaken)))
+
     return results
 
 
 def main():
-    dirPath = pargs.dir.resolve()
-    fileList = getFileList(dirPath, pargs.extensions)
+    pargs = parseArgs()
 
+    ffprobePath, ffmpegPath = checkPaths(
+        {
+            "ffprobe": r"D:\PortableApps\bin\ffprobe.exe",
+            "ffmpeg": r"D:\PortableApps\bin\ffmpeg.exe",
+        }
+    )
+
+    dirPath = pargs.dir.resolve()
+    fileList = getFileList(dirPath, pargs.extensions, pargs.recursives)
     exitIfEmpty(fileList)
+
+    outDir = makeTargetDir(dirPath / f"out_{dirPath.name}")
+    tmpFile = outDir / f"tmp_{strSum(dirPath.name)}.tmp"
+    logFile = outDir / f"log_{dirPath.name}.log"
+    outFileList = getFileList(outDir, selectFormat(), pargs.recursives)
+    if pargs.recursive:
+        if version_info >= (3, 9):
+            fileList = [
+                f
+                for f in fileList
+                if not f.is_relative_to(outDir) or f not in outFileList
+            ]
+        else:
+            fileList = [f for f in fileList if not (str(outDir) in str(f))]
+
+    outFiles = [outDir / f.relative_to(dirPath).with_suffix(outExt) for f in fileList]
+    files = tuple(zip(fileList, outFiles))
+
     if pargs.only:
         fileList = fileList[: pargs.only]
 
-    mainLoopP = lambda acc, f: mainLoop(acc, f, dirPath, pargs, ffmpegPath, ffprobePath)
+    atexit(cleanUp, (outDir, tmpFile))
+
+    mainLoopP = lambda acc, f: mainLoop(
+        acc, f, (tmpFile, logFile), pargs, ffmpegPath, ffprobePath
+    )
     results = reduce(mainLoopP, fileList, [])
 
 
 main()
+
+
+# setLogFile(outDir.joinpath(f"{dirPath.name}.log"))
+# filesLeft = len(fileList) - (idx + 1)
+# "\n"
+# f"Output estimates:: Time left: "
+# f"{readableTime(fmean(totalTime) * filesLeft)}, size: {readableSize(outMean * len(fileList))}"
