@@ -210,12 +210,12 @@ def mainLoop(acc, files, addFiles, pargs, ffPaths):
     getMetaP = lambda f, cdc: getMeta(ffprobePath, f, cdc)
     fmtIn, videoMetaIn, audioMetaIn = getMetaP(file, ("video", "audio"))
 
-    ffCmdOpts(
-        (pargs.cVideo, pargs.qVideo, pargs.speed, pargs.res, pargs.fps),
-        (pargs.cAudio, pargs.qAudio),
-        audioMetaIn,
-        videoMetaIn,
-    )
+    # ffCmdOpts(
+    #     (pargs.cVideo, pargs.qVideo, pargs.speed, pargs.res, pargs.fps),
+    #     (pargs.cAudio, pargs.qAudio),
+    #     audioMetaIn,
+    #     videoMetaIn,
+    # )
 
     if videoMetaIn:
         ov = optsVideo(
