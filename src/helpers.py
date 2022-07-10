@@ -139,7 +139,7 @@ def readableSize(sBytes):
     if sBytes == 0:
         return "0B"
     if sBytes < 0:
-        return sBytes
+        return sBytes # better fix?
     sName = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
     i = int(math.floor(math.log(sBytes, 1024)))
     p = math.pow(1024, i)

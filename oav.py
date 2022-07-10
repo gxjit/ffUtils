@@ -21,6 +21,7 @@ from src.ffHelpers import (
     readableKeys,
     selectCodec,
     selectFormat,
+    ffCmdOpts,
 )
 from src.helpers import (
     appendFile,
@@ -37,6 +38,8 @@ from src.helpers import (
     strSum,
     trackTime,
 )
+
+# Note: WIP
 
 
 def parseArgs():
@@ -199,11 +202,20 @@ def getStats(results):
     )
 
 
-def mainLoop(acc, files, addFiles, pargs, ffmpegPath, ffprobePath):
+def mainLoop(acc, files, addFiles, pargs, ffPaths):
     file, outFile = files
     tmpFile, logFile = addFiles
+    ffprobePath, ffmpegPath = ffPaths
+
     getMetaP = lambda f, cdc: getMeta(ffprobePath, f, cdc)
     fmtIn, videoMetaIn, audioMetaIn = getMetaP(file, ("video", "audio"))
+
+    ffCmdOpts(
+        (pargs.cVideo, pargs.qVideo, pargs.speed, pargs.res, pargs.fps),
+        (pargs.cAudio, pargs.qAudio),
+        audioMetaIn,
+        videoMetaIn,
+    )
 
     if videoMetaIn:
         ov = optsVideo(
@@ -216,7 +228,7 @@ def mainLoop(acc, files, addFiles, pargs, ffmpegPath, ffprobePath):
         outExt = selectFormat(pargs.cAudio)
 
     ca = selectCodec(pargs.cAudio, pargs.qAudio) if audioMetaIn else []
-    # outExt = selectFormat()
+
     tmpFile = tmpFile.with_suffix(outExt)
     outFile = outFile.with_suffix(outExt)
     cmd = getffmpegCmd(ffmpegPath, file, tmpFile, ca, cv, ov)
@@ -240,8 +252,10 @@ def mainLoop(acc, files, addFiles, pargs, ffmpegPath, ffprobePath):
     if vDiff:
         diff, src = vDiff
         print(
-            f"\n********\nWARNING: Differnce between {src} source and output "
-            f"durations is {str(round2(diff))} second(s).\n"
+            f"\n********\n"
+            f"WARNING: Differnce between {src} source and output "
+            f"durations is {str(round2(diff))} second(s)."
+            f"\n********\n"
         )
 
     results = [
@@ -277,7 +291,7 @@ def mainLoop(acc, files, addFiles, pargs, ffmpegPath, ffprobePath):
 def main():
     pargs = parseArgs()
 
-    ffprobePath, ffmpegPath = checkPaths(
+    ffPaths = checkPaths(
         {
             "ffprobe": r"D:\PortableApps\bin\ffprobe.exe",
             "ffmpeg": r"D:\PortableApps\bin\ffmpeg.exe",
@@ -285,13 +299,13 @@ def main():
     )
 
     dirPath = pargs.dir.resolve()
-    fileList = getFileList(dirPath, pargs.extensions, pargs.recursives)
+    fileList = getFileList(dirPath, pargs.extensions, pargs.recursive)
     exitIfEmpty(fileList)
 
     outDir = makeTargetDir(dirPath / f"out_{dirPath.name}")
     tmpFile = outDir / f"tmp_{strSum(dirPath.name)}.tmp"
     logFile = outDir / f"log_{dirPath.name}.log"
-    outFileList = getFileList(outDir, selectFormat(), pargs.recursives)
+    outFileList = getFileList(outDir, selectFormat(), pargs.recursive)
     if pargs.recursive:
         if version_info >= (3, 9):
             fileList = [
@@ -310,9 +324,7 @@ def main():
 
     atexit(cleanUp, (outDir, tmpFile))
 
-    mainLoopP = lambda acc, f: mainLoop(
-        acc, f, (tmpFile, logFile), pargs, ffmpegPath, ffprobePath
-    )
+    mainLoopP = lambda acc, f: mainLoop(acc, f, (tmpFile, logFile), pargs, ffPaths)
     results = reduce(mainLoopP, fileList, [])
 
 

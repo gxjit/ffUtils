@@ -22,10 +22,6 @@ ffmpegTrimCmd = lambda ffmpegPath, file, outFile, start, length: [
     "-1",
     "-ss",
     str(int(start)),
-    # "-c:v",
-    # "copy",
-    # "-c:a",
-    # "copy",
     "-c",
     "copy",
     "-avoid_negative_ts",
@@ -33,7 +29,7 @@ ffmpegTrimCmd = lambda ffmpegPath, file, outFile, start, length: [
     "-t",
     str(int(length)),
     "-loglevel",
-    "warning",  # or info
+    "24",  # warning: 24 / info: 32 / error: 16
     str(outFile),
 ]
 
@@ -45,7 +41,7 @@ getffmpegCmd = lambda ffmpegPath, file, outFile, ca=[], cv=[], ov=[]: [
     *ov,
     *ca,
     "-loglevel",
-    "warning",  # or info
+    "24",
     str(outFile),
 ]
 
@@ -121,44 +117,6 @@ def getTagKeys(meta, keys, asDict=False):
     return extractKeysDict(tags, keys, asDict)
 
 
-# def getStreamData(metaData, strm, meta):
-#     if strm is None:
-#         return None
-#     else:
-#         return getStreamKeys(metaData, strm, meta, asDict=True)
-
-
-# def getFormatData(metaData):
-#     getFormatKeys(
-#         metaData, ("format_name", "nb_streams", "duration", "bit_rate"), asDict=True
-#     )
-
-
-# def getSlctMeta(ffprobePath, file, meta=None, cdcType=None, fmt=True):
-#     metaData = getMetaData(ffprobePath, file)
-#     fmtData = getFormatData(metaData)
-#     if cdcType is None:
-#         return fmtData
-#     elif isinstance(cdcType, str):
-#         strm = findStream(metaData, cdcType)
-#         strmData = getStreamData(metaData, strm, meta)
-#         if fmt:
-#             return (fmtData, strmData)
-#         else:
-#             return strmData
-#     elif isinstance(cdcType, (list, tuple)):
-#         strmData = [
-#             getStreamData(metaData, findStream(metaData, cdc), meta) for cdc in cdcType
-#         ]
-#         if fmt:
-#             return (
-#                 fmtData,
-#                 *strmData,
-#             )
-#         else:
-#             return strmData
-
-
 def readableKeys(meta):
     retr = {}
     bitR = meta.get("bit_rate")
@@ -206,7 +164,7 @@ def selectCodec(codec, quality=None, speed=None):
             "-cutoff",
             "15500",
             "-ar",
-            "32000",
+            "32000", # sample rate limit?
         ]
         # fdk_aac defaults to a LPF cutoff around 14k
         # https://wiki.hydrogenaud.io/index.php?title=Fraunhofer_FDK_AAC#Bandwidth
@@ -269,7 +227,7 @@ def selectCodec(codec, quality=None, speed=None):
             quality or "52",
             "-preset:v",
             speed or "8",
-            "-g",
+            "-g", # -g fps*10
             "240",
         ]
 
@@ -296,12 +254,32 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
     return opts
 
 
+def ffCmdOpts(audio, video, audioMeta, videoMeta=None):
+    cAudio, qAudio = audio
+    cVideo, qVideo, vSpeed, vRes, vFps = video
+
+    if videoMeta:
+        ov = optsVideo(
+            videoMeta["height"], videoMeta["r_frame_rate"], pargs.res, pargs.fps
+        )
+        cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
+        outExt = selectFormat(pargs.cVideo)
+    else:
+        ov, cv = [], []
+        outExt = selectFormat(pargs.cAudio)
+
+    ca = selectCodec(pargs.cAudio, pargs.qAudio) if audioMeta else []
+
+    return ([*ca, *cv, *ov], outExt)
+
+
 def floatDiff(src, out, n=1):
     try:
         diff = abs(float(src) - float(out))
     except ValueError:
         return None
     return diff if diff > n else False
+
 
 # def compDur():
 #     pass
@@ -317,3 +295,40 @@ def floatDiff(src, out, n=1):
 
 
 # streams=False "-show_streams" if streams else *[]
+
+# def getStreamData(metaData, strm, meta):
+#     if strm is None:
+#         return None
+#     else:
+#         return getStreamKeys(metaData, strm, meta, asDict=True)
+
+
+# def getFormatData(metaData):
+#     getFormatKeys(
+#         metaData, ("format_name", "nb_streams", "duration", "bit_rate"), asDict=True
+#     )
+
+
+# def getSlctMeta(ffprobePath, file, meta=None, cdcType=None, fmt=True):
+#     metaData = getMetaData(ffprobePath, file)
+#     fmtData = getFormatData(metaData)
+#     if cdcType is None:
+#         return fmtData
+#     elif isinstance(cdcType, str):
+#         strm = findStream(metaData, cdcType)
+#         strmData = getStreamData(metaData, strm, meta)
+#         if fmt:
+#             return (fmtData, strmData)
+#         else:
+#             return strmData
+#     elif isinstance(cdcType, (list, tuple)):
+#         strmData = [
+#             getStreamData(metaData, findStream(metaData, cdc), meta) for cdc in cdcType
+#         ]
+#         if fmt:
+#             return (
+#                 fmtData,
+#                 *strmData,
+#             )
+#         else:
+#             return strmData
