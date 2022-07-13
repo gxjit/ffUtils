@@ -16,3 +16,67 @@
 # Size Reduction from: 585.32 KB to: 275.41 KB by: 309.91 KB.
 # Size averages:: input: 292.66 KB, output: 137.71 KB
 # Bitrate averages:: input: 96.09 KB, output: 46.74 KB.
+
+
+
+# vdoLengths = [
+#     float(x["input"]["meta"]["video"]["duration"])
+#     for x in results
+#     if x["input"]["meta"]["video"].get("duration")
+# ]
+# adoLengths = [
+#     float(x["input"]["meta"]["audio"]["duration"])
+#     for x in results
+#     if x["input"]["meta"]["audio"].get("duration")
+# ]
+
+# outFileList = getFileList(outDir, selectFormat(), pargs.recursive)
+# dbg(fileList, outFileList)
+# fileList = [
+#     f for f in fileList if (outDir / f.relative_to(dirPath) not in outFileList)
+# ]
+# if pargs.recursive:
+#     if version_info >= (3, 9):
+#         fileList = [f for f in fileList if not f.is_relative_to(outDir)]
+#     else:
+#         fileList = [f for f in fileList if (str(outDir) not in str(f))]
+
+# times = collectAtKey(results, ["timeTaken"])
+# inSizes = collectAtKey(results, ["input", "size"])
+
+
+# class AudioCfg(NamedTuple): # TODO: fix
+#     codec: str
+#     quality: int
+#     # speed: str # = None
+
+
+# class VideoCfg(NamedTuple):
+#     codec: str
+#     quality: int
+#     speed: str
+#     res: int
+#     fps: str
+
+# @dataclass
+# class AudioCfg:
+#     codec: str
+#     quality = None
+#     speed = None
+
+
+# @dataclass
+# class VideoCfg:
+#     codec: str
+#     quality = None
+#     speed = None
+#     res = None
+#     fps = None
+
+# VideoCfg = namedtuple(
+#     "video", "codec, quality, speed, res, fps", defaults=repeat(None, 5)
+# )
+# AudioCfg = namedtuple("audio", "codec, quality", defaults=repeat(None, 2))
+
+
+# from typing import NamedTuple

@@ -1,7 +1,21 @@
 from fractions import Fraction
 from json import loads
 
+# from collections import namedtuple
+from types import SimpleNamespace
+
 from .helpers import extractKeysDict, readableSize, readableTime, runCmd
+
+
+def audioCfg(codec, quality=None, speed=None):
+    # return namedtuple("audio", locals())(**locals())
+    return SimpleNamespace(**locals())
+
+
+def videoCfg(codec, quality=None, speed=None, res=None, fps=None):
+    # return namedtuple("video", locals())(**locals())
+    return SimpleNamespace(**locals())
+
 
 getffprobeCmd = lambda ffprobePath, file: [
     ffprobePath,
@@ -30,18 +44,7 @@ ffmpegTrimCmd = lambda ffmpegPath, file, outFile, start, length: [
     str(int(length)),
     "-loglevel",
     "24",  # warning: 24 / info: 32 / error: 16
-    str(outFile),
-]
-
-getffmpegCmd = lambda ffmpegPath, file, outFile, ca=[], cv=[], ov=[]: [
-    ffmpegPath,
-    "-i",
-    str(file),
-    *cv,
-    *ov,
-    *ca,
-    "-loglevel",
-    "24",
+    "-nostdin",
     str(outFile),
 ]
 
@@ -55,6 +58,20 @@ ffmpegConcatCmd = lambda ffmpegPath, splitsFile, outFile: [
     str(splitsFile),
     "-c",
     "copy",
+    "-loglevel",
+    "24",
+    "-nostdin",
+    str(outFile),
+]
+
+getffmpegCmd = lambda ffmpegPath, file, outFile, opts=[]: [
+    ffmpegPath,
+    "-i",
+    str(file),
+    *opts,
+    "-loglevel",
+    "24",
+    "-nostdin",
     str(outFile),
 ]
 
@@ -119,24 +136,13 @@ def getTagKeys(meta, keys, asDict=False):
 
 def readableKeys(meta):
     retr = {}
-    bitR = meta.get("bit_rate")
+    bitR = meta.get("bit_rate")  # fps?
     if bitR:
         retr = {**meta, "bit_rate": readableSize(float(bitR))}
     dur = meta.get("duration")
     if dur:
         retr = {**retr, "duration": readableTime(float(dur))}
     return retr
-
-
-def selectFormat(codec):
-    if codec in ("aac", "he"):
-        return ".m4a"
-    elif codec in ("opus"):
-        return ".opus"
-    elif codec in ("hevc", "avc", "av1"):
-        return ".mp4"
-    else:
-        return (".m4a", ".opus", ".mp4")
 
 
 def selectCodec(codec, quality=None, speed=None):
@@ -164,7 +170,7 @@ def selectCodec(codec, quality=None, speed=None):
             "-cutoff",
             "15500",
             "-ar",
-            "32000", # sample rate limit?
+            "32000",  # sample rate limit?
         ]
         # fdk_aac defaults to a LPF cutoff around 14k
         # https://wiki.hydrogenaud.io/index.php?title=Fraunhofer_FDK_AAC#Bandwidth
@@ -227,11 +233,22 @@ def selectCodec(codec, quality=None, speed=None):
             quality or "52",
             "-preset:v",
             speed or "8",
-            "-g", # -g fps*10
+            "-g",  # -g fps*10
             "240",
         ]
 
     return cdc
+
+
+def selectFormat(codec=None):
+    if codec is None:
+        return (".m4a", ".opus", ".mp4")
+    elif codec in ("aac", "he"):
+        return ".m4a"
+    elif codec in ("opus"):
+        return ".opus"
+    elif codec in ("hevc", "avc", "av1"):
+        return ".mp4"
 
 
 def optsVideo(srcRes, srcFps, limitRes, limitFps):
@@ -254,26 +271,23 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
     return opts
 
 
-def ffCmdOpts(audio, video, audioMeta, videoMeta=None):
-    cAudio, qAudio = audio
-    cVideo, qVideo, vSpeed, vRes, vFps = video
-
+def ffCmdOpts(audio=None, video=None, audioMeta=None, videoMeta=None):
     if videoMeta:
         ov = optsVideo(
-            videoMeta["height"], videoMeta["r_frame_rate"], pargs.res, pargs.fps
+            videoMeta["height"], videoMeta["r_frame_rate"], video.res, video.fps
         )
-        cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
-        outExt = selectFormat(pargs.cVideo)
+        cv = selectCodec(video.codec, video.quality, video.speed)
+        outExt = selectFormat(video.codec)
     else:
         ov, cv = [], []
-        outExt = selectFormat(pargs.cAudio)
+        outExt = selectFormat(audio.codec)
 
-    ca = selectCodec(pargs.cAudio, pargs.qAudio) if audioMeta else []
+    ca = selectCodec(audio.codec, audio.quality) if audioMeta else []
 
     return ([*ca, *cv, *ov], outExt)
 
 
-def floatDiff(src, out, n=1):
+def absFloatDiff(src, out, n=1):
     try:
         diff = abs(float(src) - float(out))
     except ValueError:
@@ -281,17 +295,88 @@ def floatDiff(src, out, n=1):
     return diff if diff > n else False
 
 
-# def compDur():
-#     pass
+def negFloatDiff(src, out):
+    try:
+        if float(out) > float(src):
+            return float(out) - float(src)
+        else:
+            return False
+    except ValueError:
+        return None
 
 
-# if diff:
-#     msg = f"\n\nINFO: Mismatched {strmType} source and output duration."
-# msg = (
-#     f"\n********\nWARNING: Differnce between {strmType} source and output "
-#     f"durations({str(round2(diff))} seconds) is more than {str(n)} second(s).\n"
-# )
-# printNLog(msg)
+def compMeta(
+    diffFunc,
+    diffParam,
+    fmtIn,
+    fmtOut,
+    audioMetaIn=None,
+    audioMetaOut=None,
+    videoMetaIn=None,
+    videoMetaOut=None,
+):
+
+    diff = diffFunc(fmtIn[diffParam], fmtOut[diffParam])
+
+    diffs = [(diff, "format")] if diff else []
+
+    adoDur = audioMetaIn and audioMetaIn.get(diffParam)
+    vdoDur = videoMetaIn and videoMetaIn.get(diffParam)
+
+    if adoDur:
+        diff = diffFunc(adoDur, audioMetaOut[diffParam])
+        if diff:
+            diffs = [*diffs, (diff, "audio")]
+
+    if vdoDur:
+        diff = diffFunc(vdoDur, videoMetaOut[diffParam])
+        if diff:
+            diffs = [*diffs, (diff, "audio")]
+
+    if any(diffs):
+        return diffs
+    else:
+        return False
+
+
+def compDur(
+    fmtIn,
+    fmtOut,
+    audioMetaIn=None,
+    audioMetaOut=None,
+    videoMetaIn=None,
+    videoMetaOut=None,
+):
+    compMeta(
+        absFloatDiff,
+        "duration",
+        fmtIn,
+        fmtOut,
+        audioMetaIn,
+        audioMetaOut,
+        videoMetaIn,
+        videoMetaOut,
+    )
+
+
+def compBits(
+    fmtIn,
+    fmtOut,
+    audioMetaIn=None,
+    audioMetaOut=None,
+    videoMetaIn=None,
+    videoMetaOut=None,
+):
+    compMeta(
+        negFloatDiff,
+        "bit_rate",
+        fmtIn,
+        fmtOut,
+        audioMetaIn,
+        audioMetaOut,
+        videoMetaIn,
+        videoMetaOut,
+    )
 
 
 # streams=False "-show_streams" if streams else *[]
@@ -332,3 +417,5 @@ def floatDiff(src, out, n=1):
 #             )
 #         else:
 #             return strmData
+
+

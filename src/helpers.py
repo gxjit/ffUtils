@@ -27,11 +27,27 @@ getByPath = lambda root, keys: reduce(getitem, keys, root)
 
 collectAtKey = lambda itr, key: [getByPath(i, key) for i in itr]
 
+findPercentage = lambda part, whole: f"{round2(float(part)/float(whole) * 100)}%"
+
+findPercentOf = lambda prcnt, of: round2((prcnt * of) / 100.0)
+
+posDivision = lambda x, y: round2(max(x, y) / min(x, y))
+
 
 def exitIfEmpty(x):
     if not x:
         print("Nothing to do.")
         exit()
+
+
+def waitN(n):
+    print("\n")
+    for i in reversed(range(0, n)):
+        print(
+            f"Waiting for {str(i).zfill(3)} seconds.", end="\r", flush=True
+        )  # padding for clearing digits left from multi digit coundown
+        sleep(1)
+    print("\r")
 
 
 def runCmd(cmd):
@@ -139,7 +155,7 @@ def readableSize(sBytes):
     if sBytes == 0:
         return "0B"
     if sBytes < 0:
-        return sBytes # better fix?
+        return sBytes  # better fix?
     sName = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
     i = int(math.floor(math.log(sBytes, 1024)))
     p = math.pow(1024, i)

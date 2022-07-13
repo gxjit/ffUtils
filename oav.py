@@ -2,7 +2,8 @@ from argparse import ArgumentParser
 from atexit import register as atexit
 from functools import reduce
 from statistics import fmean
-from sys import version_info
+from json import dumps, loads
+from pathlib import Path
 
 from src.cliHelpers import (
     addCliDir,
@@ -14,22 +15,26 @@ from src.cliHelpers import (
     checkValIn,
 )
 from src.ffHelpers import (
-    floatDiff,
+    audioCfg,
+    videoCfg,
+    compBits,
+    compDur,
+    ffCmdOpts,
     getffmpegCmd,
     getMeta,
-    optsVideo,
     readableKeys,
-    selectCodec,
-    selectFormat,
-    ffCmdOpts,
 )
 from src.helpers import (
     appendFile,
     checkPaths,
     cleanUp,
     exitIfEmpty,
+    extractKeysDict,
+    findPercentage,
+    findPercentOf,
     getFileList,
     makeTargetDir,
+    posDivision,
     readableDict,
     readableSize,
     readableTime,
@@ -37,6 +42,7 @@ from src.helpers import (
     runCmd,
     strSum,
     trackTime,
+    waitN,
 )
 
 # Note: WIP
@@ -154,32 +160,51 @@ def meta(cType=None):
         return basic
 
 
-# Format: nb_streams, duration, bit_rate, format_name, format_long_name
+def checkDurs(comp):
+    if comp:
+        for diff, src in comp:
+            print(
+                f"\n********\n"
+                f"WARNING: Differnce between {src} source and output "
+                f"durations is {str(round2(diff))} second(s)."
+                f"\n********\n"
+            )
+
+
+def checkBits(comp):
+    if comp:
+        for diff, src in comp:
+            print(
+                f"\n********\n"
+                f"WARNING: {src.capitalize()} output bit rate is"
+                f" higher by {readableSize(diff)} than source."
+                f"\n********\n"
+            )
 
 
 def getStats(results):
     times = [float(x["timeTaken"]) for x in results]
     inSizes = [float(x["input"]["size"]) for x in results]
-    # times = collectAtKey(results, ["timeTaken"])
-    # inSizes = collectAtKey(results, ["input", "size"])
     outSizes = [float(x["output"]["size"]) for x in results]
-    lenghts = [float(x["input"]["meta"]["video"]["duration"]) for x in results]
-    VidBitsIn = [float(x["input"]["meta"]["video"]["bit_rate"]) for x in results]
-    VidBitsOut = [float(x["output"]["meta"]["video"]["bit_rate"]) for x in results]
+    lenghts = [float(x["input"]["meta"]["format"]["duration"]) for x in results]
+    totalBitsIn = [float(x["input"]["meta"]["format"]["bit_rate"]) for x in results]
+    totalBitsOut = [float(x["output"]["meta"]["format"]["bit_rate"]) for x in results]
 
     inSum, inMean = sum(inSizes), fmean(inSizes)
     outSum, outMean = sum(outSizes), fmean(outSizes)
     sumTimes, meanTimes = sum(times), fmean(times)
     sumLengths, meanLengths = sum(lenghts), fmean(lenghts)
-    VidBitsInMean, VidBitsOutMean = fmean(VidBitsIn), fmean(VidBitsOut)
+    totalBitsInMean, totalBitsOutMean = fmean(totalBitsIn), fmean(totalBitsOut)
 
     return (
         f"\n"
-        f'\nProcessed file: {results[-1]["input"]["file"].name}'
-        f'\nVideo Input:: {readableDict(readableKeys(results[-1]["input"]["meta"]["video"]))}'  # noqa
-        f'\nVideo Output:: {readableDict(readableKeys(results[-1]["output"]["meta"]["video"]))}'  # noqa
+        f'\nProcessed file: {Path(results[-1]["input"]["file"]).name}'
+        # "\nVideo Input:: "
+        # f'{readableDict(readableKeys(results[-1]["input"]["meta"]["video"]))}'
+        # "\nVideo Output:: "
+        # f'{readableDict(readableKeys(results[-1]["output"]["meta"]["video"]))}'
         "\n\n"
-        f"Size averages:: Reduction: {round2(((inMean-outMean)/inMean)*100)}%"
+        f"Size averages:: Reduction: {findPercentage(outMean, inMean)}"
         f", Input: {(readableSize(inMean))}"
         f" & Output: {(readableSize(outMean))}."
         "\n"
@@ -187,7 +212,7 @@ def getStats(results):
         f", Input: {readableSize(inSum)}"
         f" & Output: {readableSize(outSum)}."
         "\n"
-        f"Processing averages:: Speed: x{round2(max(meanLengths, meanTimes)/min(meanLengths, meanTimes))}"
+        f"Processing averages:: Speed: x{posDivision(meanLengths, meanTimes)}"
         f" {'slower' if meanTimes > meanLengths else 'faster'}"
         f", Time: {readableTime(meanTimes)}"
         f" & Length: {readableTime(meanLengths)}."
@@ -196,42 +221,35 @@ def getStats(results):
         f", Time: {readableTime(sumTimes)}"
         f" & Length: {readableTime(sumLengths)}."
         "\n"
-        f"Video bitrate averages:: Reduction: {round2(((VidBitsInMean-VidBitsOutMean)/VidBitsInMean)*100)}%"  # noqa
-        f", Input: {(readableSize(VidBitsInMean))}"
-        f" & Output: {(readableSize(VidBitsOutMean))}."
+        "Total bitrate averages:: Reduction: "
+        f"{findPercentage(totalBitsOutMean, totalBitsInMean)}"
+        f", Input: {(readableSize(totalBitsInMean))}"
+        f" & Output: {(readableSize(totalBitsOutMean))}."
     )
 
 
-def mainLoop(acc, files, addFiles, pargs, ffPaths):
+def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs):
     file, outFile = files
-    tmpFile, logFile = addFiles
+    tmpFile, logFile, jsonFile = addFiles
     ffprobePath, ffmpegPath = ffPaths
+    audio, video = AVCfg
 
     getMetaP = lambda f, cdc: getMeta(ffprobePath, f, cdc)
     fmtIn, videoMetaIn, audioMetaIn = getMetaP(file, ("video", "audio"))
 
-    # ffCmdOpts(
-    #     (pargs.cVideo, pargs.qVideo, pargs.speed, pargs.res, pargs.fps),
-    #     (pargs.cAudio, pargs.qAudio),
-    #     audioMetaIn,
-    #     videoMetaIn,
-    # )
-
-    if videoMetaIn:
-        ov = optsVideo(
-            videoMetaIn["height"], videoMetaIn["r_frame_rate"], pargs.res, pargs.fps
-        )
-        cv = selectCodec(pargs.cVideo, pargs.qVideo, pargs.speed)
-        outExt = selectFormat(pargs.cVideo)
-    else:
-        ov, cv = [], []
-        outExt = selectFormat(pargs.cAudio)
-
-    ca = selectCodec(pargs.cAudio, pargs.qAudio) if audioMetaIn else []
+    ffOpts, outExt = ffCmdOpts(
+        audio,
+        video,
+        audioMetaIn,
+        videoMetaIn,
+    )
 
     tmpFile = tmpFile.with_suffix(outExt)
     outFile = outFile.with_suffix(outExt)
-    cmd = getffmpegCmd(ffmpegPath, file, tmpFile, ca, cv, ov)
+    if tmpFile.exists():
+        tmpFile.unlink()
+
+    cmd = getffmpegCmd(ffmpegPath, file, tmpFile, ffOpts)
 
     cmdOut, timeTaken = trackTime(runCmd, cmd)
 
@@ -241,22 +259,11 @@ def mainLoop(acc, files, addFiles, pargs, ffPaths):
 
     fmtOut, videoMetaOut, audioMetaOut = getMetaP(outFile, ("video", "audio"))
 
-    vdoDur = videoMetaIn and videoMetaIn.get("duration")
-    adoDur = audioMetaIn and audioMetaIn.get("duration")
-    if vdoDur:
-        vDiff = (floatDiff(vdoDur, videoMetaOut["duration"]), "video")
-    elif adoDur:
-        vDiff = (floatDiff(adoDur, audioMetaOut["duration"]), "audio")
-    else:
-        vDiff = (floatDiff(fmtIn["duration"], fmtOut["duration"]), "format")
-    if vDiff:
-        diff, src = vDiff
-        print(
-            f"\n********\n"
-            f"WARNING: Differnce between {src} source and output "
-            f"durations is {str(round2(diff))} second(s)."
-            f"\n********\n"
-        )
+    durs = compDur(fmtIn, fmtOut, audioMetaIn, audioMetaOut, videoMetaIn, videoMetaOut)
+    checkDurs(durs)
+
+    bits = compBits(fmtIn, fmtOut, audioMetaIn, audioMetaOut, videoMetaIn, videoMetaOut)
+    checkBits(bits)
 
     results = [
         *acc,
@@ -264,28 +271,36 @@ def mainLoop(acc, files, addFiles, pargs, ffPaths):
             "cmd": cmd,
             "timeTaken": timeTaken,
             "input": {
-                "file": file,
+                "file": str(file),
                 "size": file.stat().st_size,
-                "meta": {"video": videoMetaIn, "audio": audioMetaIn},
+                "meta": {"format": fmtIn, "audio": audioMetaIn, "video": videoMetaIn},
             },
             "output": {
-                "file": outFile,
+                "file": str(outFile),
                 "size": outFile.stat().st_size,
-                "meta": {"video": videoMetaOut, "audio": audioMetaOut},
+                "meta": {
+                    "format": fmtOut,
+                    "audio": audioMetaOut,
+                    "video": videoMetaOut,
+                },
             },
         },
     ]
+    jsonFile.write_text(dumps(results))
 
     stats = getStats(results)
     print(stats)
     appendFile(logFile, stats)
 
-    # if pargs.wait:
-    #     waitN(int(pargs.wait))
-    # else:
-    #     waitN(int(dynWait(timeTaken)))
+    if pargs.wait:
+        waitN(int(pargs.wait))
+    else:
+        waitN(int(findPercentOf(8, timeTaken)))
 
     return results
+
+
+dbg = print
 
 
 def main():
@@ -305,18 +320,17 @@ def main():
     outDir = makeTargetDir(dirPath / f"out_{dirPath.name}")
     tmpFile = outDir / f"tmp_{strSum(dirPath.name)}.tmp"
     logFile = outDir / f"log_{dirPath.name}.log"
-    outFileList = getFileList(outDir, selectFormat(), pargs.recursive)
-    if pargs.recursive:
-        if version_info >= (3, 9):
-            fileList = [
-                f
-                for f in fileList
-                if not f.is_relative_to(outDir) or f not in outFileList
-            ]
-        else:
-            fileList = [f for f in fileList if not (str(outDir) in str(f))]
+    jsonFile = outDir / f"cfg_{dirPath.name}.json"
 
-    outFiles = [outDir / f.relative_to(dirPath).with_suffix(outExt) for f in fileList]
+    jsonData = loads(jsonFile.read_text()) if jsonFile.exists() else []
+
+    if jsonData:
+        processed = [x["input"]["file"] for x in jsonData]
+        fileList = [f for f in fileList if str(f) not in processed]
+
+    # remove tempfile from fileList
+
+    outFiles = [outDir / f.relative_to(dirPath) for f in fileList]
     files = tuple(zip(fileList, outFiles))
 
     if pargs.only:
@@ -324,8 +338,13 @@ def main():
 
     atexit(cleanUp, (outDir, tmpFile))
 
-    mainLoopP = lambda acc, f: mainLoop(acc, f, (tmpFile, logFile), pargs, ffPaths)
-    results = reduce(mainLoopP, fileList, [])
+    video = videoCfg(pargs.cVideo, pargs.qVideo, pargs.speed, pargs.res, pargs.fps)
+    audio = audioCfg(pargs.cAudio, pargs.qAudio)
+
+    mainLoopP = lambda acc, f: mainLoop(
+        acc, f, (tmpFile, logFile, jsonFile), (audio, video), ffPaths, pargs
+    )
+    results = reduce(mainLoopP, files, jsonData)
 
 
 main()
@@ -336,3 +355,4 @@ main()
 # "\n"
 # f"Output estimates:: Time left: "
 # f"{readableTime(fmean(totalTime) * filesLeft)}, size: {readableSize(outMean * len(fileList))}"
+

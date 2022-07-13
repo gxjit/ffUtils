@@ -84,3 +84,4 @@ def addCliWait(parser, dft=10):
         type=int,
         help=f"Wait time in seconds between each iteration, default is {dft}",
     )
+    return parser
