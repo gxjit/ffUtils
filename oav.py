@@ -1,9 +1,9 @@
 from argparse import ArgumentParser
 from atexit import register as atexit
 from functools import reduce
-from statistics import fmean
 from json import dumps, loads
 from pathlib import Path
+from statistics import fmean
 
 from src.cliHelpers import (
     addCliDir,
@@ -16,20 +16,19 @@ from src.cliHelpers import (
 )
 from src.ffHelpers import (
     audioCfg,
-    videoCfg,
     compBits,
     compDur,
     ffCmdOpts,
     getffmpegCmd,
     getMeta,
-    readableKeys,
+    readableMeta,
+    videoCfg,
 )
 from src.helpers import (
     appendFile,
     checkPaths,
     cleanUp,
     exitIfEmpty,
-    extractKeysDict,
     findPercentage,
     findPercentOf,
     getFileList,
@@ -150,16 +149,6 @@ def parseArgs():
     return parser.parse_args()
 
 
-def meta(cType=None):
-    basic = ["codec_type", "codec_name", "profile", "duration", "bit_rate"]
-    if cType == "audio":
-        return [*basic, "channels", "sample_rate"]
-    elif cType == "video":
-        return [*basic, "height", "r_frame_rate", "pix_fmt"]
-    else:
-        return basic
-
-
 def checkDurs(comp):
     if comp:
         for diff, src in comp:
@@ -186,9 +175,21 @@ def getStats(results):
     times = [float(x["timeTaken"]) for x in results]
     inSizes = [float(x["input"]["size"]) for x in results]
     outSizes = [float(x["output"]["size"]) for x in results]
-    lenghts = [float(x["input"]["meta"]["format"]["duration"]) for x in results]
-    totalBitsIn = [float(x["input"]["meta"]["format"]["bit_rate"]) for x in results]
-    totalBitsOut = [float(x["output"]["meta"]["format"]["bit_rate"]) for x in results]
+    lenghts = [
+        float(x["input"]["format"]["duration"])
+        for x in results
+        if x["input"]["format"].get("duration")
+    ]
+    totalBitsIn = [
+        float(x["input"]["format"]["bits"])
+        for x in results
+        if x["input"]["format"].get("bits")
+    ]
+    totalBitsOut = [
+        float(x["output"]["format"]["bits"])
+        for x in results
+        if x["output"]["format"].get("bits")
+    ]
 
     inSum, inMean = sum(inSizes), fmean(inSizes)
     outSum, outMean = sum(outSizes), fmean(outSizes)
@@ -199,10 +200,10 @@ def getStats(results):
     return (
         f"\n"
         f'\nProcessed file: {Path(results[-1]["input"]["file"]).name}'
-        # "\nVideo Input:: "
-        # f'{readableDict(readableKeys(results[-1]["input"]["meta"]["video"]))}'
-        # "\nVideo Output:: "
-        # f'{readableDict(readableKeys(results[-1]["output"]["meta"]["video"]))}'
+        "\nVideo Input:: "
+        f'{readableDict(readableMeta(results[-1]["input"]["video"]))}'
+        "\nVideo Output:: "
+        f'{readableDict(readableMeta(results[-1]["output"]["video"]))}'
         "\n\n"
         f"Size averages:: Reduction: {findPercentage(outMean, inMean)}"
         f", Input: {(readableSize(inMean))}"
@@ -273,16 +274,16 @@ def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs):
             "input": {
                 "file": str(file),
                 "size": file.stat().st_size,
-                "meta": {"format": fmtIn, "audio": audioMetaIn, "video": videoMetaIn},
+                "format": fmtIn._asdict(),
+                "audio": audioMetaIn._asdict(),
+                "video": videoMetaIn._asdict(),
             },
             "output": {
                 "file": str(outFile),
                 "size": outFile.stat().st_size,
-                "meta": {
-                    "format": fmtOut,
-                    "audio": audioMetaOut,
-                    "video": videoMetaOut,
-                },
+                "format": fmtOut._asdict(),
+                "audio": audioMetaOut._asdict(),
+                "video": videoMetaOut._asdict(),
             },
         },
     ]
@@ -316,25 +317,25 @@ def main():
     dirPath = pargs.dir.resolve()
     fileList = getFileList(dirPath, pargs.extensions, pargs.recursive)
     exitIfEmpty(fileList)
+    if pargs.only:
+        fileList = fileList[: pargs.only]
 
     outDir = makeTargetDir(dirPath / f"out_{dirPath.name}")
     tmpFile = outDir / f"tmp_{strSum(dirPath.name)}.tmp"
     logFile = outDir / f"log_{dirPath.name}.log"
     jsonFile = outDir / f"cfg_{dirPath.name}.json"
+    # if tmpFile in fileList:
+    #     # remove tempfile from fileList
 
     jsonData = loads(jsonFile.read_text()) if jsonFile.exists() else []
 
     if jsonData:
         processed = [x["input"]["file"] for x in jsonData]
         fileList = [f for f in fileList if str(f) not in processed]
-
-    # remove tempfile from fileList
+        # tmpFile = jsonData["tmpFile"]
 
     outFiles = [outDir / f.relative_to(dirPath) for f in fileList]
     files = tuple(zip(fileList, outFiles))
-
-    if pargs.only:
-        fileList = fileList[: pargs.only]
 
     atexit(cleanUp, (outDir, tmpFile))
 
@@ -355,4 +356,3 @@ main()
 # "\n"
 # f"Output estimates:: Time left: "
 # f"{readableTime(fmean(totalTime) * filesLeft)}, size: {readableSize(outMean * len(fileList))}"
-

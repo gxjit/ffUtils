@@ -5,7 +5,7 @@ from operator import getitem
 from pathlib import Path
 from shutil import which
 from subprocess import run
-from time import time
+from time import sleep, time
 from traceback import format_exc
 from zlib import adler32
 

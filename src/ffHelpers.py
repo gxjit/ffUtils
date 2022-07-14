@@ -1,10 +1,9 @@
+from collections import namedtuple
 from fractions import Fraction
 from json import loads
-
-# from collections import namedtuple
 from types import SimpleNamespace
 
-from .helpers import extractKeysDict, readableSize, readableTime, runCmd
+from .helpers import extractKeysDict, readableSize, readableTime, runCmd, round2
 
 
 def audioCfg(codec, quality=None, speed=None):
@@ -15,6 +14,41 @@ def audioCfg(codec, quality=None, speed=None):
 def videoCfg(codec, quality=None, speed=None, res=None, fps=None):
     # return namedtuple("video", locals())(**locals())
     return SimpleNamespace(**locals())
+
+
+def fmtMeta(metaData):
+    m = metaData["format"].get
+    data = {
+        "file": m("filename"),
+        "size": m("size"),
+        "format": m("format_name"),
+        "streams": m("nb_streams"),
+        "duration": m("duration"),
+        "bits": m("bit_rate"),
+    }
+    return namedtuple("FormatMeta", data)(**data)
+
+
+def streamMeta(metaData, strm):
+    m = metaData["streams"][strm].get
+    data = {
+        "type": m("codec_type"),
+        "codec": m("codec_name"),
+        "profile": m("profile"),
+        "duration": m("duration"),
+        "bits": m("bit_rate"),
+    }
+    if data["type"] == "audio":
+        data = {**data, "channels": m("channels"), "samples": m("sample_rate")}
+    elif data["type"] == "video":
+        data = {
+            **data,
+            "height": m("height"),
+            "fps": m("r_frame_rate"),
+            "pixFmt": m("pix_fmt"),
+        }  # "color_range" "color_primaries"
+
+    return namedtuple("StreamMeta", data)(**data)
 
 
 getffprobeCmd = lambda ffprobePath, file: [
@@ -95,27 +129,17 @@ def findStream(meta, sType):
     return None
 
 
-def getFormatData(meta):
-    return meta["format"]
-
-
-def getStreamData(meta, strm):
-    return meta["streams"][strm] if strm is not None else None
-
-
 def getMeta(ffprobePath, file, cdcType=None, fmt=True):
     metaData = getMetaData(ffprobePath, file)
-    fmtData = getFormatData(metaData)
+    fmtData = fmtMeta(metaData)
     if cdcType is None:
         return fmtData
     elif isinstance(cdcType, str):
         strm = findStream(metaData, cdcType)
-        strmData = getStreamData(metaData, strm)
+        strmData = streamMeta(metaData, strm)
         return (fmtData, strmData) if fmt else strmData
     elif isinstance(cdcType, (list, tuple)):
-        strmData = [
-            getStreamData(metaData, findStream(metaData, cdc)) for cdc in cdcType
-        ]
+        strmData = [streamMeta(metaData, findStream(metaData, cdc)) for cdc in cdcType]
         return (fmtData, *strmData) if fmt else strmData
 
 
@@ -134,15 +158,25 @@ def getTagKeys(meta, keys, asDict=False):
     return extractKeysDict(tags, keys, asDict)
 
 
-def readableKeys(meta):
-    retr = {}
-    bitR = meta.get("bit_rate")  # fps?
+def readableMeta(meta):
+    if isinstance(meta, tuple) and hasattr(meta, "_asdict"):
+        data = meta._asdict()
+    elif isinstance(meta, dict):
+        data = {**meta}  # Don't mutate source
+
+    bitR = data.get("bits")
     if bitR:
-        retr = {**meta, "bit_rate": readableSize(float(bitR))}
-    dur = meta.get("duration")
+        data["bits"] = readableSize(float(bitR))
+
+    dur = data.get("duration")
     if dur:
-        retr = {**retr, "duration": readableTime(float(dur))}
-    return retr
+        data["duration"] = readableTime(float(dur))
+
+    fps = data.get("fps")
+    if fps:
+        data["fps"] = round2(float(Fraction(fps)))
+
+    return data
 
 
 def selectCodec(codec, quality=None, speed=None):
@@ -273,9 +307,7 @@ def optsVideo(srcRes, srcFps, limitRes, limitFps):
 
 def ffCmdOpts(audio=None, video=None, audioMeta=None, videoMeta=None):
     if videoMeta:
-        ov = optsVideo(
-            videoMeta["height"], videoMeta["r_frame_rate"], video.res, video.fps
-        )
+        ov = optsVideo(videoMeta.height, videoMeta.fps, video.res, video.fps)
         cv = selectCodec(video.codec, video.quality, video.speed)
         outExt = selectFormat(video.codec)
     else:
@@ -316,20 +348,20 @@ def compMeta(
     videoMetaOut=None,
 ):
 
-    diff = diffFunc(fmtIn[diffParam], fmtOut[diffParam])
+    diff = diffFunc(getattr(fmtIn, diffParam), getattr(fmtOut, diffParam))
 
     diffs = [(diff, "format")] if diff else []
 
-    adoDur = audioMetaIn and audioMetaIn.get(diffParam)
-    vdoDur = videoMetaIn and videoMetaIn.get(diffParam)
+    adoDur = audioMetaIn and getattr(audioMetaIn, diffParam)
+    vdoDur = videoMetaIn and getattr(videoMetaIn, diffParam)
 
     if adoDur:
-        diff = diffFunc(adoDur, audioMetaOut[diffParam])
+        diff = diffFunc(adoDur, getattr(audioMetaOut, diffParam))
         if diff:
             diffs = [*diffs, (diff, "audio")]
 
     if vdoDur:
-        diff = diffFunc(vdoDur, videoMetaOut[diffParam])
+        diff = diffFunc(vdoDur, getattr(videoMetaOut, diffParam))
         if diff:
             diffs = [*diffs, (diff, "audio")]
 
@@ -350,12 +382,13 @@ def compDur(
     compMeta(
         absFloatDiff,
         "duration",
-        fmtIn,
-        fmtOut,
-        audioMetaIn,
-        audioMetaOut,
-        videoMetaIn,
-        videoMetaOut,
+        **locals()
+        # fmtIn,
+        # fmtOut,
+        # audioMetaIn,
+        # audioMetaOut,
+        # videoMetaIn,
+        # videoMetaOut,
     )
 
 
@@ -369,17 +402,41 @@ def compBits(
 ):
     compMeta(
         negFloatDiff,
-        "bit_rate",
-        fmtIn,
-        fmtOut,
-        audioMetaIn,
-        audioMetaOut,
-        videoMetaIn,
-        videoMetaOut,
+        "bits",
+        **locals()
+        # fmtIn,
+        # fmtOut,
+        # audioMetaIn,
+        # audioMetaOut,
+        # videoMetaIn,
+        # videoMetaOut,
     )
 
 
 # streams=False "-show_streams" if streams else *[]
+
+# def getFormatData(meta):
+#     return meta["format"]
+
+
+# def getStreamData(meta, strm):
+#     return meta["streams"][strm] if strm is not None else None
+
+# def getMeta(ffprobePath, file, cdcType=None, fmt=True):
+#     metaData = getMetaData(ffprobePath, file)
+#     fmtData = getFormatData(metaData)
+#     if cdcType is None:
+#         return fmtData
+#     elif isinstance(cdcType, str):
+#         strm = findStream(metaData, cdcType)
+#         strmData = getStreamData(metaData, strm)
+#         return (fmtData, strmData) if fmt else strmData
+#     elif isinstance(cdcType, (list, tuple)):
+#         strmData = [
+#             getStreamData(metaData, findStream(metaData, cdc)) for cdc in cdcType
+#         ]
+#         return (fmtData, *strmData) if fmt else strmData
+
 
 # def getStreamData(metaData, strm, meta):
 #     if strm is None:
@@ -417,5 +474,3 @@ def compBits(
 #             )
 #         else:
 #             return strmData
-
-

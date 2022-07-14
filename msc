@@ -80,3 +80,49 @@
 
 
 # from typing import NamedTuple
+
+
+# def meta(cType=None):
+#     basic = ["codec_type", "codec_name", "profile", "duration", "bit_rate"]
+#     if cType == "audio":
+#         return [*basic, "channels", "sample_rate"]
+#     elif cType == "video":
+#         return [*basic, "height", "r_frame_rate", "pix_fmt"]
+#     else:
+#         return basic
+
+
+# def compMeta(
+#     diffFunc,
+#     diffParam,
+#     fmtIn,
+#     fmtOut,
+#     audioMetaIn=None,
+#     audioMetaOut=None,
+#     videoMetaIn=None,
+#     videoMetaOut=None,
+# ):
+
+#     diff = diffFunc(fmtIn[diffParam], fmtOut[diffParam])
+
+#     diffs = [(diff, "format")] if diff else []
+
+#     adoDur = audioMetaIn and audioMetaIn.get(diffParam)
+#     vdoDur = videoMetaIn and videoMetaIn.get(diffParam)
+
+#     if adoDur:
+#         diff = diffFunc(adoDur, audioMetaOut[diffParam])
+#         if diff:
+#             diffs = [*diffs, (diff, "audio")]
+
+#     if vdoDur:
+#         diff = diffFunc(vdoDur, videoMetaOut[diffParam])
+#         if diff:
+#             diffs = [*diffs, (diff, "audio")]
+
+#     if any(diffs):
+#         return diffs
+#     else:
+#         return False
+
+
