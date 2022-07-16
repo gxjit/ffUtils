@@ -1,3 +1,4 @@
+from json import loads
 from pathlib import Path
 from shutil import which
 from subprocess import run
@@ -46,6 +47,14 @@ def runCmd(cmd):
         reportErr(callErr)
         # return callErr
     return cmdOut
+
+
+def runCmdJson(cmd):
+    cmdOut = runCmd(cmd)
+    if isinstance(cmdOut, Exception):
+        return cmdOut
+    data = loads(cmdOut)
+    return data
 
 
 def checkPath(path, absPath=None):

@@ -1,20 +1,24 @@
-from collections import namedtuple
 from fractions import Fraction
-from json import loads
-from types import SimpleNamespace
 
-from .helpers import extractKeysDict, readableSize, readableTime, round2
-from .osHelpers import runCmd
+from .helpers import (
+    dictToNspace,
+    dictToNTuple,
+    extractKeysDict,
+    readableSize,
+    readableTime,
+    round2,
+)
+from .osHelpers import runCmdJson
 
 
 def audioCfg(codec, quality=None, speed=None):
     # return namedtuple("audio", locals())(**locals())
-    return SimpleNamespace(**locals())
+    return dictToNspace(locals())
 
 
 def videoCfg(codec, quality=None, speed=None, res=None, fps=None):
     # return namedtuple("video", locals())(**locals())
-    return SimpleNamespace(**locals())
+    return dictToNspace(locals())
 
 
 def fmtMeta(metaData):
@@ -27,7 +31,7 @@ def fmtMeta(metaData):
         "duration": m("duration"),
         "bits": m("bit_rate"),
     }
-    return namedtuple("FormatMeta", data)(**data)
+    return dictToNTuple("FormatMeta", data)
 
 
 def streamMeta(metaData, strm):
@@ -49,7 +53,7 @@ def streamMeta(metaData, strm):
             "pixFmt": m("pix_fmt"),
         }  # "color_range" "color_primaries"
 
-    return namedtuple("StreamMeta", data)(**data)
+    return dictToNTuple("StreamMeta", data)
 
 
 getffprobeCmd = lambda ffprobePath, file: [
@@ -113,11 +117,7 @@ getffmpegCmd = lambda ffmpegPath, file, outFile, opts=[]: [
 
 def getMetaData(ffprobePath, file):
     ffprobeCmd = getffprobeCmd(ffprobePath, file)
-    cmdOut = runCmd(ffprobeCmd)
-    if isinstance(cmdOut, Exception):
-        return cmdOut
-    metaData = loads(cmdOut)
-    return metaData
+    return runCmdJson(ffprobeCmd)
 
 
 def findStream(meta, sType):
@@ -381,11 +381,7 @@ def compDur(
     videoMetaIn=None,
     videoMetaOut=None,
 ):
-    compMeta(
-        absFloatDiff,
-        "duration",
-        **locals()
-    )
+    compMeta(absFloatDiff, "duration", **locals())
 
 
 def compBits(
@@ -396,11 +392,7 @@ def compBits(
     videoMetaIn=None,
     videoMetaOut=None,
 ):
-    compMeta(
-        negFloatDiff,
-        "bits",
-        **locals()
-    )
+    compMeta(negFloatDiff, "bits", **locals())
 
 
 # streams=False "-show_streams" if streams else *[]

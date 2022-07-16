@@ -7,6 +7,7 @@ from time import time
 from types import SimpleNamespace
 from zlib import adler32
 
+
 round2 = lambda x: round(float(x), ndigits=2)
 
 readableTime = lambda sec: str(timedelta(seconds=sec)).split(".")[0]
