@@ -25,22 +25,24 @@ from src.ffHelpers import (
     videoCfg,
 )
 from src.helpers import (
-    appendFile,
-    checkPaths,
-    cleanUp,
-    exitIfEmpty,
     findPercentage,
     findPercentOf,
-    getFileList,
-    makeTargetDir,
     posDivision,
     readableDict,
     readableSize,
     readableTime,
     round2,
-    runCmd,
     strSum,
     trackTime,
+)
+from src.osHelpers import (
+    appendFile,
+    checkPaths,
+    cleanUp,
+    exitIfEmpty,
+    getFileList,
+    makeTargetDir,
+    runCmd,
     waitN,
 )
 
@@ -171,7 +173,8 @@ def checkBits(comp):
             )
 
 
-def getStats(results):
+def getStats(results, totalFiles):
+    filesLeft = totalFiles - len(results)
     times = [float(x["timeTaken"]) for x in results]
     inSizes = [float(x["input"]["size"]) for x in results]
     outSizes = [float(x["output"]["size"]) for x in results]
@@ -226,10 +229,14 @@ def getStats(results):
         f"{findPercentage(totalBitsOutMean, totalBitsInMean)}"
         f", Input: {(readableSize(totalBitsInMean))}"
         f" & Output: {(readableSize(totalBitsOutMean))}."
+        "\n"
+        f"Output estimates:: Time left: "
+        f"{readableTime(meanTimes * filesLeft)},"
+        f" size: {readableSize(outMean * totalFiles)}"
     )
 
 
-def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs):
+def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs, totalFiles):
     file, outFile = files
     tmpFile, logFile, jsonFile = addFiles
     ffprobePath, ffmpegPath = ffPaths
@@ -287,9 +294,9 @@ def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs):
             },
         },
     ]
-    jsonFile.write_text(dumps(results))
+    jsonFile.write_text(dumps(results, indent=2))
 
-    stats = getStats(results)
+    stats = getStats(results, totalFiles)
     print(stats)
     appendFile(logFile, stats)
 
@@ -299,9 +306,6 @@ def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs):
         waitN(int(findPercentOf(8, timeTaken)))
 
     return results
-
-
-dbg = print
 
 
 def main():
@@ -324,9 +328,9 @@ def main():
     tmpFile = outDir / f"tmp_{strSum(dirPath.name)}.tmp"
     logFile = outDir / f"log_{dirPath.name}.log"
     jsonFile = outDir / f"cfg_{dirPath.name}.json"
-    # if tmpFile in fileList:
-    #     # remove tempfile from fileList
-
+    if tmpFile in fileList:
+        fileList = [f for f in fileList if not str(f) == str(tmpFile)]
+    totalFiles = len(fileList)
     jsonData = loads(jsonFile.read_text()) if jsonFile.exists() else []
 
     if jsonData:
@@ -343,7 +347,13 @@ def main():
     audio = audioCfg(pargs.cAudio, pargs.qAudio)
 
     mainLoopP = lambda acc, f: mainLoop(
-        acc, f, (tmpFile, logFile, jsonFile), (audio, video), ffPaths, pargs
+        acc,
+        f,
+        (tmpFile, logFile, jsonFile),
+        (audio, video),
+        ffPaths,
+        pargs,
+        totalFiles,
     )
     results = reduce(mainLoopP, files, jsonData)
 
@@ -352,7 +362,3 @@ main()
 
 
 # setLogFile(outDir.joinpath(f"{dirPath.name}.log"))
-# filesLeft = len(fileList) - (idx + 1)
-# "\n"
-# f"Output estimates:: Time left: "
-# f"{readableTime(fmean(totalTime) * filesLeft)}, size: {readableSize(outMean * len(fileList))}"

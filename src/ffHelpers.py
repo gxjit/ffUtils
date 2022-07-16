@@ -3,7 +3,8 @@ from fractions import Fraction
 from json import loads
 from types import SimpleNamespace
 
-from .helpers import extractKeysDict, readableSize, readableTime, runCmd, round2
+from .helpers import extractKeysDict, readableSize, readableTime, round2
+from .osHelpers import runCmd
 
 
 def audioCfg(codec, quality=None, speed=None):
@@ -181,8 +182,9 @@ def readableMeta(meta):
 
 def selectCodec(codec, quality=None, speed=None):
 
-    if quality:
-        quality = str(quality)
+    # if quality:
+    #     quality = str(quality)
+    quality = quality and str(quality)
 
     if codec == "ac":
         cdc = ["-c:a", "copy"]
@@ -383,12 +385,6 @@ def compDur(
         absFloatDiff,
         "duration",
         **locals()
-        # fmtIn,
-        # fmtOut,
-        # audioMetaIn,
-        # audioMetaOut,
-        # videoMetaIn,
-        # videoMetaOut,
     )
 
 
@@ -404,12 +400,6 @@ def compBits(
         negFloatDiff,
         "bits",
         **locals()
-        # fmtIn,
-        # fmtOut,
-        # audioMetaIn,
-        # audioMetaOut,
-        # videoMetaIn,
-        # videoMetaOut,
     )
 
 

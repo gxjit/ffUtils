@@ -12,14 +12,6 @@ def checkDirPath(pth):
         raise ArgumentTypeError("Invalid Directory path")
 
 
-def sepExts(exts):
-    if "," in exts:
-        return efilter(len, exts.strip().split(","))
-    else:
-        return [exts]
-        # raise ArgumentTypeError("Invalid extensions list")
-
-
 def checkValIn(val, valIn, typ):
     val = val.lower()
     if val in valIn:
@@ -68,9 +60,10 @@ def addCliExt(parser, defaults=None):
     parser.add_argument(
         "-e",
         "--extensions",
+        nargs='+',
+        help='Space separated file extensions. (default: .mp4 .mov)',
         default=defaults,
-        help="Comma separated file extensions. (default: .mp4, .mov)",
-        type=sepExts,
+        type=str,
     )
     return parser
 
@@ -85,3 +78,5 @@ def addCliWait(parser, dft=10):
         help=f"Wait time in seconds between each iteration, default is {dft}",
     )
     return parser
+
+
