@@ -5,6 +5,10 @@ from subprocess import run
 from time import sleep
 from traceback import format_exc
 
+from .pkgState import getLogFile
+
+# from __main__ import __file__ as mainFile
+
 
 def exitIfEmpty(x):
     if not x:
@@ -20,18 +24,6 @@ def waitN(n):
         )  # padding for clearing digits left from multi digit coundown
         sleep(1)
     print("\r")
-
-
-def reportErr(exp=None, ext=True):
-    print("\n------\nERROR: Something went wrong.")
-    if exp and exp.stderr:
-        print(f"\nStdErr: {exp.stderr}\nReturn Code: {exp.returncode}")
-    if exp:
-        print(
-            f"\nException:\n{exp}\n\nAdditional Details:\n{format_exc()}",
-        )
-    if ext:
-        exit()
 
 
 def checkExceptions(output):
@@ -123,6 +115,30 @@ def appendFile(file, contents):
     #     file.touch()
     with open(file, "a") as f:
         f.write(str(contents))
+
+
+def log(msg):  # prefix="[lvl] now(): msg"
+    msg = str(msg)
+    logFile = getLogFile()
+    print(msg)
+    if logFile:
+        appendFile(logFile, f"{msg}\n")
+
+
+# def logWarn(), logError()
+# debug info warn error critical
+
+
+def reportErr(exp=None, ext=True):
+    log("\n------\nERROR: Something went wrong.")
+    if exp and exp.stderr:
+        log(f"\nStdErr: {exp.stderr}\nReturn Code: {exp.returncode}")
+    if exp:
+        log(
+            f"\nException:\n{exp}\n\nAdditional Details:\n{format_exc()}",
+        )
+    if ext:
+        exit()
 
 
 def cleanUp(paths):

@@ -4,6 +4,7 @@ from functools import reduce
 from json import dumps, loads
 from pathlib import Path
 from statistics import fmean
+from __main__ import __file__ as mainFile
 
 from src.cliHelpers import (
     addCliDir,
@@ -28,34 +29,35 @@ from src.helpers import (
     findPercentage,
     findPercentOf,
     posDivision,
+    prefixDots,
     readableDict,
     readableSize,
     readableTime,
     round2,
     strSum,
     trackTime,
+    now
 )
 from src.osHelpers import (
-    appendFile,
     checkPaths,
     cleanUp,
     exitIfEmpty,
     getFileList,
+    log,
     makeTargetDir,
     runCmd,
     waitN,
 )
+from src.pkgState import setLogFile
 
-# Note: WIP
 
 
 def parseArgs():
 
     aCodec = lambda v: checkValIn(v, ["opus", "he", "aac", "ac"], str)
     vCodec = lambda v: checkValIn(v, ["avc", "hevc", "av1", "vn", "vc"], str)
-    inExts = (
-        *(".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv"),
-        *(".flac", ".wav", ".m4a", ".mp3"),
+    inExts = prefixDots(
+        (*("mp4", "mov", "mkv", "webm", "avi", "wmv"), *("flac", "wav", "m4a", "mp3"))
     )
 
     parser = ArgumentParser(
@@ -154,7 +156,7 @@ def parseArgs():
 def checkDurs(comp):
     if comp:
         for diff, src in comp:
-            print(
+            log(
                 f"\n********\n"
                 f"WARNING: Differnce between {src} source and output "
                 f"durations is {str(round2(diff))} second(s)."
@@ -165,7 +167,7 @@ def checkDurs(comp):
 def checkBits(comp):
     if comp:
         for diff, src in comp:
-            print(
+            log(
                 f"\n********\n"
                 f"WARNING: {src.capitalize()} output bit rate is"
                 f" higher by {readableSize(diff)} than source."
@@ -296,14 +298,13 @@ def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs, totalFiles):
     ]
     jsonFile.write_text(dumps(results, indent=2))
 
-    stats = getStats(results, totalFiles)
-    print(stats)
-    appendFile(logFile, stats)
+    log(getStats(results, totalFiles))
 
-    if pargs.wait:
-        waitN(int(pargs.wait))
-    else:
-        waitN(int(findPercentOf(8, timeTaken)))
+    if not totalFiles == len(results):
+        if pargs.wait:
+            waitN(int(pargs.wait))
+        else:
+            waitN(int(findPercentOf(8, timeTaken)))
 
     return results
 
@@ -328,20 +329,22 @@ def main():
     tmpFile = outDir / f"tmp_{strSum(dirPath.name)}.tmp"
     logFile = outDir / f"log_{dirPath.name}.log"
     jsonFile = outDir / f"cfg_{dirPath.name}.json"
+
     if tmpFile in fileList:
         fileList = [f for f in fileList if not str(f) == str(tmpFile)]
     totalFiles = len(fileList)
-    jsonData = loads(jsonFile.read_text()) if jsonFile.exists() else []
 
+    jsonData = loads(jsonFile.read_text()) if jsonFile.exists() else []
     if jsonData:
         processed = [x["input"]["file"] for x in jsonData]
         fileList = [f for f in fileList if str(f) not in processed]
-        # tmpFile = jsonData["tmpFile"]
 
     outFiles = [outDir / f.relative_to(dirPath) for f in fileList]
     files = tuple(zip(fileList, outFiles))
 
     atexit(cleanUp, (outDir, tmpFile))
+    setLogFile(logFile)
+    log(f"\n\n=== {Path(mainFile).stem} Started at {now()} ===\n")
 
     video = videoCfg(pargs.cVideo, pargs.qVideo, pargs.speed, pargs.res, pargs.fps)
     audio = audioCfg(pargs.cAudio, pargs.qAudio)
@@ -360,5 +363,3 @@ def main():
 
 main()
 
-
-# setLogFile(outDir.joinpath(f"{dirPath.name}.log"))

@@ -12,12 +12,10 @@ from .osHelpers import runCmdJson
 
 
 def audioCfg(codec, quality=None, speed=None):
-    # return namedtuple("audio", locals())(**locals())
     return dictToNspace(locals())
 
 
 def videoCfg(codec, quality=None, speed=None, res=None, fps=None):
-    # return namedtuple("video", locals())(**locals())
     return dictToNspace(locals())
 
 
@@ -396,63 +394,3 @@ def compBits(
 
 
 # streams=False "-show_streams" if streams else *[]
-
-# def getFormatData(meta):
-#     return meta["format"]
-
-
-# def getStreamData(meta, strm):
-#     return meta["streams"][strm] if strm is not None else None
-
-# def getMeta(ffprobePath, file, cdcType=None, fmt=True):
-#     metaData = getMetaData(ffprobePath, file)
-#     fmtData = getFormatData(metaData)
-#     if cdcType is None:
-#         return fmtData
-#     elif isinstance(cdcType, str):
-#         strm = findStream(metaData, cdcType)
-#         strmData = getStreamData(metaData, strm)
-#         return (fmtData, strmData) if fmt else strmData
-#     elif isinstance(cdcType, (list, tuple)):
-#         strmData = [
-#             getStreamData(metaData, findStream(metaData, cdc)) for cdc in cdcType
-#         ]
-#         return (fmtData, *strmData) if fmt else strmData
-
-
-# def getStreamData(metaData, strm, meta):
-#     if strm is None:
-#         return None
-#     else:
-#         return getStreamKeys(metaData, strm, meta, asDict=True)
-
-
-# def getFormatData(metaData):
-#     getFormatKeys(
-#         metaData, ("format_name", "nb_streams", "duration", "bit_rate"), asDict=True
-#     )
-
-
-# def getSlctMeta(ffprobePath, file, meta=None, cdcType=None, fmt=True):
-#     metaData = getMetaData(ffprobePath, file)
-#     fmtData = getFormatData(metaData)
-#     if cdcType is None:
-#         return fmtData
-#     elif isinstance(cdcType, str):
-#         strm = findStream(metaData, cdcType)
-#         strmData = getStreamData(metaData, strm, meta)
-#         if fmt:
-#             return (fmtData, strmData)
-#         else:
-#             return strmData
-#     elif isinstance(cdcType, (list, tuple)):
-#         strmData = [
-#             getStreamData(metaData, findStream(metaData, cdc), meta) for cdc in cdcType
-#         ]
-#         if fmt:
-#             return (
-#                 fmtData,
-#                 *strmData,
-#             )
-#         else:
-#             return strmData

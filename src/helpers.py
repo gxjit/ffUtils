@@ -6,7 +6,7 @@ from operator import getitem
 from time import time
 from types import SimpleNamespace
 from zlib import adler32
-
+from datetime import datetime
 
 round2 = lambda x: round(float(x), ndigits=2)
 
@@ -35,6 +35,16 @@ posDivision = lambda x, y: round2(max(x, y) / min(x, y))
 dictToNTuple = lambda name, dic: namedtuple(name, dic)(**dic)
 
 dictToNspace = lambda dic: SimpleNamespace(**dic)
+
+prefixDots = lambda vals: [f".{v}" for v in vals]
+
+now = lambda: str(datetime.now()).split(".")[0]
+
+timeNow = lambda: str(datetime.now().time()).split(".")[0]
+
+dateNow = lambda: str(datetime.now().date()).split(".")[0]
+
+strDTime = lambda: datetime.now().strftime("%y%m%d-%H%M%S")
 
 
 def extractKeysDict(dic, keys, asDict=False):

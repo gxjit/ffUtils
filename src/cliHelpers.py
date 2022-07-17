@@ -1,7 +1,7 @@
-from pathlib import Path
 from argparse import ArgumentTypeError
+from pathlib import Path
 
-from .helpers import efilter
+from .helpers import csvToList, prefixDots
 
 
 def checkDirPath(pth):
@@ -60,12 +60,12 @@ def addCliExt(parser, defaults=None):
     parser.add_argument(
         "-e",
         "--extensions",
-        nargs='+',
-        help='Space separated file extensions. (default: .mp4 .mov)',
+        help=f'Comma separated file extensions. (default: {", ".join(defaults)})',
         default=defaults,
-        type=str,
+        type=lambda e: prefixDots(csvToList(e)),
     )
     return parser
+
 
 def addCliWait(parser, dft=10):
     parser.add_argument(
@@ -78,5 +78,3 @@ def addCliWait(parser, dft=10):
         help=f"Wait time in seconds between each iteration, default is {dft}",
     )
     return parser
-
-
