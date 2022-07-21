@@ -1,31 +1,16 @@
 from argparse import ArgumentParser
 
-from src.cliHelpers import addCliDir, addCliDry, addCliRec,     addCliExt
+from src.cliHelpers import addCliDir, addCliExt, addCliOnly, addCliRec
 from src.ffHelpers import ffmpegConcatCmd, ffmpegTrimCmd, getFormatKeys, getMetaData
-from src.helpers import (
-    checkPaths,
-    emap,
-    exitIfEmpty,
-    getFileList,
-    range1,
-    removeFiles,
-    runCmd,
-    strSum,
-)
+from src.helpers import emap, range1, strSum
+from src.osHelpers import checkPaths, exitIfEmpty, getFileList, removeFiles, runCmd
 
 
-def parseArgs():
-
-    parser = ArgumentParser(
-        description=(
-            "Trim specific number of samples from Video content "
-            "for specified lengths and concatenate them into a single file."
-        )
-    )
+def cliArgs(parser):
     parser = addCliDir(parser)
     parser = addCliRec(parser)
-    parser = addCliDry(parser)
     parser = addCliExt(parser, (".mp4", ".mov"))
+    parser = addCliOnly(parser)
     parser.add_argument(
         "-l",
         "--length",
@@ -40,27 +25,7 @@ def parseArgs():
         type=int,
         help="Number of samples samples.",
     )
-    parser.add_argument(
-        "-o",
-        "--only",
-        default=None,
-        type=int,
-        help="Only process N files.",
-    )
-    return parser.parse_args()
-
-
-pargs = parseArgs()
-
-ffprobePath, ffmpegPath = checkPaths(
-    {
-        "ffprobe": r"D:\PortableApps\bin\ffprobe.exe",
-        "ffmpeg": r"D:\PortableApps\bin\ffmpeg.exe",
-    }
-)
-
-if pargs.dry:
-    runCmd = print
+    return parser
 
 
 def calcSplits(secs, splits, length):
@@ -77,17 +42,13 @@ def makeSplits(ffmpegPath, file, splits, length):
         outFiles = [*outFiles, outFile]
     concat = "\n".join([f"file '{f}'" for f in outFiles])
     splitsFile = file.with_suffix(".splits")
-    if not pargs.dry:
-        splitsFile.write_text(concat)
-    else:
-        print(concat)
+    splitsFile.write_text(concat)
     return (splitsFile, outFiles)
 
 
 def concatSplits(ffmpegPath, splitsFile, tmpFiles, outFile):
     runCmd(ffmpegConcatCmd(ffmpegPath, splitsFile, outFile))
-    if not pargs.dry:
-        removeFiles([splitsFile, *tmpFiles])
+    removeFiles([splitsFile, *tmpFiles])
 
 
 def mainLoop(file, pargs, ffmpegPath, ffprobePath):
@@ -99,7 +60,15 @@ def mainLoop(file, pargs, ffmpegPath, ffprobePath):
     concatSplits(ffmpegPath, splitsFile, tmpFiles, outFile)
 
 
-def main():
+def main(pargs):
+
+    ffprobePath, ffmpegPath = checkPaths(
+        {
+            "ffprobe": r"D:\PortableApps\bin\ffprobe.exe",
+            "ffmpeg": r"D:\PortableApps\bin\ffmpeg.exe",
+        }
+    )
+
     fileList = getFileList(pargs.dir.resolve(), pargs.extensions, pargs.recursive)
 
     exitIfEmpty(fileList)
@@ -112,7 +81,14 @@ def main():
     emap(mainLoopP, fileList)
 
 
-main()
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        description=(
+            "Trim specific number of samples from Video content "
+            "for specified lengths and concatenate them into a single file."
+        )
+    )
+    main(cliArgs(parser).parse_args())
 
 
 # different algos for splits

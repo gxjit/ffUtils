@@ -7,8 +7,6 @@ from traceback import format_exc
 
 from .pkgState import getLogFile
 
-# from __main__ import __file__ as mainFile
-
 
 def exitIfEmpty(x):
     if not x:
@@ -56,7 +54,7 @@ def checkPath(path, absPath=None):
     elif absPath and which(absPath):
         return absPath
     else:
-        raise f"{path} or {absPath} is not an executable."
+        raise Exception(f"{path} or {absPath} is not an executable.")
 
 
 def checkPaths(paths):
@@ -148,3 +146,34 @@ def cleanUp(paths):
                 rmEmptyDir(path)
             elif path.is_file():
                 removeFile(path)
+
+
+def getInput():
+    print("\nPress Enter Key continue or input 'e' to exit.")
+    try:
+        choice = input("\n> ")
+        if choice not in ["e", ""]:
+            raise ValueError
+
+    except ValueError:
+        print("\nInvalid input.")
+        choice = getInput()
+
+    if choice == "e":
+        exit()
+
+
+def areYouSure():
+    print("\nAre you sure you want to continue? (y/n)")
+    try:
+        choice = str(input("\n> ")).lower()
+        if choice not in ["y", "n"]:
+            raise ValueError
+    except ValueError:
+        print("\nInvalid input.")
+        areYouSure()
+
+    if choice == "y":
+        return
+    else:
+        exit()

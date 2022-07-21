@@ -4,16 +4,15 @@ from functools import reduce
 from json import dumps, loads
 from pathlib import Path
 from statistics import fmean
+
 from __main__ import __file__ as mainFile
 
 from src.cliHelpers import (
     addCliDir,
-    addCliDry,
     addCliExt,
     addCliOnly,
     addCliRec,
     addCliWait,
-    checkValIn,
 )
 from src.ffHelpers import (
     audioCfg,
@@ -28,6 +27,7 @@ from src.ffHelpers import (
 from src.helpers import (
     findPercentage,
     findPercentOf,
+    now,
     posDivision,
     prefixDots,
     readableDict,
@@ -36,7 +36,6 @@ from src.helpers import (
     round2,
     strSum,
     trackTime,
-    now
 )
 from src.osHelpers import (
     checkPaths,
@@ -51,21 +50,16 @@ from src.osHelpers import (
 from src.pkgState import setLogFile
 
 
+def cliArgs(parser):
 
-def parseArgs():
-
-    aCodec = lambda v: checkValIn(v, ["opus", "he", "aac", "ac"], str)
-    vCodec = lambda v: checkValIn(v, ["avc", "hevc", "av1", "vn", "vc"], str)
+    vCodecs = ["avc", "hevc", "av1", "vn", "vc"]
+    aCodecs = ["opus", "he", "aac", "ac"]
     inExts = prefixDots(
         (*("mp4", "mov", "mkv", "webm", "avi", "wmv"), *("flac", "wav", "m4a", "mp3"))
     )
 
-    parser = ArgumentParser(
-        description="Optimize Video/Audio files by encoding to avc/hevc/aac/opus."
-    )
     parser = addCliDir(parser)
     parser = addCliRec(parser)
-    parser = addCliDry(parser)
     parser = addCliOnly(parser)
     parser = addCliExt(parser, inExts)
     parser = addCliWait(parser)
@@ -102,7 +96,8 @@ def parseArgs():
         "-ca",
         "--cAudio",
         default="he",
-        type=aCodec,
+        choices=aCodecs,
+        type=str,
         help='Select an audio codec from AAC-LC: "aac", HE-AAC/AAC-LC with SBR: "he" '
         ', Opus: "opus" and copy: "ac". (default: he)',
     )
@@ -110,7 +105,8 @@ def parseArgs():
         "-cv",
         "--cVideo",
         default="hevc",
-        type=vCodec,
+        choices=vCodecs,
+        type=str,
         help='Select a video codec from HEVC/H265: "hevc", AVC/H264: "avc" , '
         'AV1: "av1", copy: "vc" and no video: "vn". (default: hevc)',
     )
@@ -133,7 +129,7 @@ def parseArgs():
         "-fm",
         "--format",
         action="store_true",
-        help="Use metadata from container format for duration comparison.",
+        help="Use metadata from container format for comparison.",
     )
     # parser.add_argument(
     #     "-fa",
@@ -150,7 +146,7 @@ def parseArgs():
     #     help="Video container format; can be mp4, mkv, etc. (default: mp4)",
     # )
 
-    return parser.parse_args()
+    return parser
 
 
 def checkDurs(comp):
@@ -309,8 +305,7 @@ def mainLoop(acc, files, addFiles, AVCfg, ffPaths, pargs, totalFiles):
     return results
 
 
-def main():
-    pargs = parseArgs()
+def main(pargs):
 
     ffPaths = checkPaths(
         {
@@ -361,5 +356,8 @@ def main():
     results = reduce(mainLoopP, files, jsonData)
 
 
-main()
-
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        description="Optimize Video/Audio files by encoding to avc/hevc/aac/opus."
+    )
+    main(cliArgs(parser).parse_args())

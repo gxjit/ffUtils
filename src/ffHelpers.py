@@ -180,8 +180,6 @@ def readableMeta(meta):
 
 def selectCodec(codec, quality=None, speed=None):
 
-    # if quality:
-    #     quality = str(quality)
     quality = quality and str(quality)
 
     if codec == "ac":

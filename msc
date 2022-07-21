@@ -126,3 +126,11 @@
 #         return False
 
 
+# bar = subparsers.add_parser("bar", parents=[parent_parser], add_help=False)
+
+# subparsers = parser.add_subparsers(help='Description')
+
+# command1_parser = subparsers.add_parser("command1")
+# command1_parser.set_defaults(func=command1)
+
+# args.func(args)

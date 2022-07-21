@@ -1,12 +1,17 @@
 import math
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import reduce
+from itertools import chain
 from operator import getitem
+from re import compile
 from time import time
 from types import SimpleNamespace
 from zlib import adler32
-from datetime import datetime
+
+flatten = chain.from_iterable
+
+flatMap = lambda x, y: list(flatten(map(x, y)))
 
 round2 = lambda x: round(float(x), ndigits=2)
 
@@ -85,3 +90,7 @@ def csvToList(vals):
         return efilter(len, vals.strip().split(","))
     else:
         return [vals]
+
+
+def nSort(s, nsre=compile("([0-9]+)")):
+    return [int(text) if text.isdigit() else text.lower() for text in nsre.split(s)]
